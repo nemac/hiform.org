@@ -1,0 +1,19 @@
+<?php
+
+/**
+ * Functions which support the theming of the hiform theme
+ */
+
+function hiform_preprocess_field(&$variables, $hook) {
+    if ($variables['field_name'] !== 'field_icon') {
+        return;
+    }
+
+    try {
+        $url = $variables['element']['#object']->get('field_link_to_internal_landing_p')->first()->getUrl()->toString();
+	$variables['wrapper_link'] = $url;
+    } catch (Exception $e) {
+        // I don't know what to add here. I'm just adding this try catch block in case a user has
+	// a front page link block without a link. But I don't think that needs to surface.
+    }
+}

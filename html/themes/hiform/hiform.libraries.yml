@@ -1,0 +1,12 @@
+global-styling:
+  version: 1.0
+  css:
+    theme:
+      css/style.css: {}
+fonts:
+  css:
+    theme:
+      '//fonts.googleapis.com/css?family=Source+Sans+Pro': { type: external, minified: true }
+slick-fixes:
+  js:
+    js/slick-fixes.js: {}

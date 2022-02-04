@@ -1,0 +1,6 @@
+sites/*/files
+sites/*/private
+vendor
+*~
+./README.md
+sites/default/settings.php
