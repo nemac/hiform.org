@@ -6,6 +6,8 @@ use Drupal\ckeditor5\Plugin\Editor\CKEditor5;
 use Drupal\editor\Entity\Editor;
 use Drupal\file\Entity\File;
 use Drupal\filter\Entity\FilterFormat;
+use Drupal\language\Entity\ConfigurableLanguage;
+use Drupal\language\Entity\ContentLanguageSettings;
 use Drupal\media\Entity\Media;
 use Drupal\Tests\BrowserTestBase;
 use Drupal\Tests\ckeditor5\Traits\SynchronizeCsrfTokenSeedTrait;
@@ -15,12 +17,12 @@ use Drupal\user\RoleInterface;
 use Symfony\Component\Validator\ConstraintViolation;
 
 /**
- * Tests that image media types are determined correctly.
+ * Tests the media entity metadata API.
  *
  * @group ckeditor5
  * @internal
  */
-class MediaImageTest extends BrowserTestBase {
+class MediaEntityMetadataApiTest extends BrowserTestBase {
 
   use TestFileCreationTrait;
   use MediaTypeCreationTrait;
@@ -65,10 +67,17 @@ class MediaImageTest extends BrowserTestBase {
   protected $editor;
 
   /**
+   * @var \Drupal\Component\Uuid\UuidInterface
+   */
+  protected $uuidService;
+
+  /**
    * {@inheritdoc}
    */
   protected function setUp(): void {
     parent::setUp();
+
+    $this->uuidService = $this->container->get('uuid');
 
     $filtered_html_format = FilterFormat::create([
       'format' => 'filtered_html',
@@ -147,10 +156,10 @@ class MediaImageTest extends BrowserTestBase {
   }
 
   /**
-   * Tests that media entity with image field is recognized.
+   * Tests the media entity metadata API.
    */
-  public function testIsMediaImage() {
-    $path = '/ckeditor5/filtered_html/is-media-image';
+  public function testApi() {
+    $path = '/ckeditor5/filtered_html/media-entity-metadata';
     $token = $this->container->get('csrf_token')->get(ltrim($path, '/'));
     $uuid = $this->mediaImage->uuid();
 
@@ -159,16 +168,33 @@ class MediaImageTest extends BrowserTestBase {
 
     $this->drupalGet($path, ['query' => ['uuid' => $uuid, 'token' => $token]]);
     $this->assertSession()->statusCodeEquals(200);
-    $this->assertSame(json_encode(TRUE), $this->getSession()->getPage()->getContent());
+    $this->assertSame(json_encode(['imageSourceMetadata' => ['alt' => 'default alt']]), $this->getSession()->getPage()->getContent());
+
+    $this->mediaImage->set('field_media_image', [
+      'target_id' => 1,
+      'alt' => '',
+      'title' => 'default title',
+    ])->save();
+    $this->drupalGet($path, ['query' => ['uuid' => $uuid, 'token' => $token]]);
+    $this->assertSession()->statusCodeEquals(200);
+    $this->assertSame(json_encode(['imageSourceMetadata' => ['alt' => '']]), $this->getSession()->getPage()->getContent());
 
     $this->drupalGet($path, ['query' => ['uuid' => $this->mediaFile->uuid(), 'token' => $token]]);
     $this->assertSession()->statusCodeEquals(200);
-    $this->assertSame(json_encode(FALSE), $this->getSession()->getPage()->getContent());
+    $this->assertSame(json_encode([]), $this->getSession()->getPage()->getContent());
 
     // Ensure that unpublished media returns 403.
     $this->mediaImage->setUnpublished()->save();
     $this->drupalGet($path, ['query' => ['uuid' => $uuid, 'token' => $token]]);
     $this->assertSession()->statusCodeEquals(403);
+
+    // Ensure that valid, but non-existing UUID returns 404.
+    $this->drupalGet($path, ['query' => ['uuid' => $this->uuidService->generate(), 'token' => $token]]);
+    $this->assertSession()->statusCodeEquals(404);
+
+    // Ensure that invalid UUID returns 400.
+    $this->drupalGet($path, ['query' => ['uuid' => '🦙', 'token' => $token]]);
+    $this->assertSession()->statusCodeEquals(400);
 
     // Ensure that users that don't have access to the filter format receive
     // either 404 or 403.
@@ -183,6 +209,49 @@ class MediaImageTest extends BrowserTestBase {
     $this->mediaImage->setPublished()->save();
     $this->drupalGet($path, ['query' => ['uuid' => $uuid, 'token' => $token]]);
     $this->assertSession()->statusCodeEquals(403);
+  }
+
+  /**
+   * Tests the media entity metadata API with translations.
+   */
+  public function testApiTranslation(): void {
+    $this->container->get('module_installer')->install(['language', 'content_translation']);
+    $this->resetAll();
+    ConfigurableLanguage::create(['id' => 'fi'])->save();
+    $this->container->get('config.factory')->getEditable('language.negotiation')
+      ->set('url.source', 'path_prefix')
+      ->set('url.prefixes.fi', 'fi')
+      ->save();
+    $this->rebuildContainer();
+    ContentLanguageSettings::loadByEntityTypeBundle('media', 'image')
+      ->setDefaultLangcode('en')
+      ->setLanguageAlterable(TRUE)
+      ->save();
+    $media_fi = Media::load($this->mediaImage->id())->addTranslation('fi');
+    $media_fi->field_media_image->setValue([
+      [
+        'target_id' => '1',
+        // cSpell:disable-next-line
+        'alt' => 'oletus alt-teksti kuvalle',
+      ],
+    ]);
+    $media_fi->save();
+    $uuid = $this->mediaImage->uuid();
+
+    $path = '/ckeditor5/filtered_html/media-entity-metadata';
+    $token = $this->container->get('csrf_token')->get(ltrim($path, '/'));
+
+    // Ensure that translation is returned when language is specified.
+    $this->drupalGet($path, ['query' => ['uuid' => $uuid, 'token' => $token], 'language' => $media_fi->language()]);
+    $this->assertSession()->statusCodeEquals(200);
+    // cSpell:disable-next-line
+    $this->assertSame(json_encode(['imageSourceMetadata' => ['alt' => 'oletus alt-teksti kuvalle']]), $this->getSession()->getPage()->getContent());
+
+    // Ensure that default translation is returned when no language is
+    // specified.
+    $this->drupalGet($path, ['query' => ['uuid' => $uuid, 'token' => $token]]);
+    $this->assertSession()->statusCodeEquals(200);
+    $this->assertSame(json_encode(['imageSourceMetadata' => ['alt' => 'default alt']]), $this->getSession()->getPage()->getContent());
   }
 
 }
