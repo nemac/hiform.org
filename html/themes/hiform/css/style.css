@@ -121,12 +121,13 @@ header {
 .field--name-field-filtered-landing-page-link > .field__items {
     display: flex;
     flex-wrap: wrap;
+    justify-content: center;
 }
 
 .field--name-field-filtered-landing-page-link > .field__items > .field__item {
     flex: 0 0 33.33%;
     max-width: 33.33%;
-    padding: 0 25px;
+    padding: 0 25px 25px 25px;
 }
 
 .field--name-field-filtered-landing-page-link > .field__items > .field__item:first-child {
