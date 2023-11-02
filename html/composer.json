@@ -21,7 +21,8 @@
         "drupal/core-project-message": "^9",
         "drupal/core-recommended": "^9",
         "drupal/core-vendor-hardening": "^8.8",
-        "drupal/smtp": "^1.0"
+        "drupal/smtp": "^1.0",
+        "drupal/upgrade_status": "^4.0"
     },
     "conflict": {
         "drupal/drupal": "*"
@@ -34,7 +35,8 @@
             "composer/installers": true,
             "drupal/core-composer-scaffold": true,
             "drupal/core-project-message": true,
-            "drupal/core-vendor-hardening": true
+            "drupal/core-vendor-hardening": true,
+            "dealerdirect/phpcodesniffer-composer-installer": true
         }
     },
     "extra": {
@@ -90,5 +92,8 @@
                 "      composer remove drupal/core-project-message"
             ]
         }
+    },
+    "require-dev": {
+        "drupal/core-dev": "9.5.11"
     }
 }
