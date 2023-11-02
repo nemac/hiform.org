@@ -23,6 +23,7 @@
         "drupal/core-vendor-hardening": "^8.8",
         "drupal/paragraphs": "^1.16",
         "drupal/smtp": "^1.0",
+        "drupal/token": "^1.13",
         "drupal/upgrade_status": "^4.0"
     },
     "conflict": {
