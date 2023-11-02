@@ -21,6 +21,7 @@
         "drupal/core-project-message": "^9",
         "drupal/core-recommended": "^9",
         "drupal/core-vendor-hardening": "^8.8",
+        "drupal/paragraphs": "^1.16",
         "drupal/smtp": "^1.0",
         "drupal/upgrade_status": "^4.0"
     },
