@@ -1,4 +1,23 @@
 
+Slick 8.x-2.0-dev, 2022-02-03
+-----------------------------
+- Micro optimization: Modernizing PHP sections: null coalescing, destructuring.
+- Reverted minimum requirements till D10 rules the entire world. Back to basic
+  dBlazy.once for now, etc.
+
+Slick 8.x-2.0-dev, 2021-12-21
+-----------------------------
+- Issue #3255266 by alexpott: Fix Slick entity information so entity doesn't not
+  change after install.
+
+Slick 8.x-2.0-dev, 2021-12-17
+-----------------------------
+- Issue #3253013 by gausarts: [Slick] Drupal 10.
+- Issue #3254667 by gausarts: Update to use the new vanilla once for 9.3 compat.
+- Issue #3246544 by tanmayk, PCate, joelpittet: Error displayed if package.json
+  is not in the JS library folder.
+- Added Drupal ^10.
+
 Slick 8.x-2.0-dev, 2021-09-29
 -----------------------------
 -Issue #3239708 by gausarts: Drop theme_slick_grid for theme_item_list via

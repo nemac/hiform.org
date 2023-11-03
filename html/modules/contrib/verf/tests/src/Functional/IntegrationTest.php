@@ -19,7 +19,7 @@ class IntegrationTest extends BrowserTestBase {
   /**
    * {@inheritdoc}
    */
-  public static $modules = ['verf_test_views'];
+  protected static $modules = ['verf_test_views'];
 
   /**
    * The node type used in the tests.
@@ -52,7 +52,7 @@ class IntegrationTest extends BrowserTestBase {
   /**
    * {@inheritdoc}
    */
-  public function setUp() {
+  public function setUp(): void {
     parent::setUp();
 
     $this->nodeType = $this->drupalCreateContentType();
@@ -115,7 +115,7 @@ class IntegrationTest extends BrowserTestBase {
     $teasers = $this->getSession()->getPage()->findAll('css', '.node--view-mode-teaser');
 
     foreach ($teasers as $teaser) {
-      $this->assertNotContains($text, $teaser->getText());
+      $this->assertStringNotContainsString($text, $teaser->getText());
     }
   }
 

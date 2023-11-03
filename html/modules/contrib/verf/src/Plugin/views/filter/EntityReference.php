@@ -9,6 +9,7 @@ use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\EntityTypeBundleInfoInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
@@ -24,7 +25,8 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  *
  * @ViewsFilter("verf")
  */
-class EntityReference extends InOperator implements ContainerFactoryPluginInterface {
+class EntityReference extends InOperator implements ContainerFactoryPluginInterface
+{
 
   /**
    * The entity type bundle info.
@@ -64,6 +66,13 @@ class EntityReference extends InOperator implements ContainerFactoryPluginInterf
   protected $targetEntityType;
 
   /**
+   * Module handler service.
+   *
+   * @var \Drupal\Core\Extension\ModuleHandlerInterface
+   */
+  protected $moduleHandler;
+
+  /**
    * Constructs a new instance.
    *
    * @param mixed[] $configuration
@@ -80,13 +89,16 @@ class EntityReference extends InOperator implements ContainerFactoryPluginInterf
    *   The entity type bundle info.
    * @param \Drupal\Core\Entity\EntityTypeInterface $target_entity_type
    *   The target entity type.
+   * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
+   *   The module handler.
    */
-  public function __construct(array $configuration, $plugin_id, array $plugin_definition, LanguageManagerInterface $language_manager, EntityStorageInterface $target_entity_storage, EntityTypeBundleInfoInterface $entity_type_bundle_info, EntityTypeInterface $target_entity_type) {
+  public function __construct(array $configuration, $plugin_id, array $plugin_definition, LanguageManagerInterface $language_manager, EntityStorageInterface $target_entity_storage, EntityTypeBundleInfoInterface $entity_type_bundle_info, EntityTypeInterface $target_entity_type, ModuleHandlerInterface $module_handler) {
     parent::__construct($configuration, $plugin_id, $plugin_definition);
     $this->entityTypeBundleInfo = $entity_type_bundle_info;
     $this->targetEntityStorage = $target_entity_storage;
     $this->targetEntityType = $target_entity_type;
     $this->languageManager = $language_manager;
+    $this->moduleHandler = $module_handler;
   }
 
   /**
@@ -95,8 +107,7 @@ class EntityReference extends InOperator implements ContainerFactoryPluginInterf
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
     /** @var \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager */
     $entity_type_manager = $container->get('entity_type.manager');
-
-    return new static($configuration, $plugin_id, $plugin_definition, $container->get('language_manager'), $entity_type_manager->getStorage($configuration['verf_target_entity_type_id']), $container->get('entity_type.bundle.info'), $entity_type_manager->getDefinition($configuration['verf_target_entity_type_id']));
+    return new static($configuration, $plugin_id, $plugin_definition, $container->get('language_manager'), $entity_type_manager->getStorage($configuration['verf_target_entity_type_id']), $container->get('entity_type.bundle.info'), $entity_type_manager->getDefinition($configuration['verf_target_entity_type_id']), $container->get('module_handler'));
   }
 
   /**
@@ -108,6 +119,10 @@ class EntityReference extends InOperator implements ContainerFactoryPluginInterf
       'default' => [],
     ];
 
+    $options['show_unpublished'] = [
+      'default' => FALSE,
+    ];
+
     return $options;
   }
 
@@ -116,6 +131,13 @@ class EntityReference extends InOperator implements ContainerFactoryPluginInterf
    */
   public function buildOptionsForm(&$form, FormStateInterface $form_state) {
     parent::buildOptionsForm($form, $form_state);
+
+    $form['show_unpublished'] = [
+      '#type' => 'checkbox',
+      '#title' => t("Ignore access control"),
+      '#default_value' => $this->options['show_unpublished'],
+    ];
+
     if (!$this->targetEntityType->hasKey('bundle')) {
       return $form;
     }
@@ -192,12 +214,25 @@ class EntityReference extends InOperator implements ContainerFactoryPluginInterf
     $target_bundles = array_filter($this->options['verf_target_bundles']);
     if ($this->targetEntityType->hasKey('bundle') && $target_bundles) {
       $query = $this->targetEntityStorage->getQuery();
+      $query->accessCheck(TRUE);
       $query->condition($this->targetEntityType->getKey('bundle'), $target_bundles, 'IN');
       $target_ids = $query->execute();
     }
 
     $this->referenceableEntities = $this->targetEntityStorage->loadMultiple($target_ids);
-    return $this->referenceableEntities;
+
+    if (!$this->options['show_unpublished']) {
+      $filtered_target_ids = [];
+      foreach ($this->referenceableEntities as $entity) {
+        if ($entity->access('view')) {
+          $filtered_target_ids[] = $entity;
+        }
+      }
+      $this->referenceableEntities = $filtered_target_ids;
+    }
+    $referenceable_entities = $this->referenceableEntities;
+    $this->moduleHandler->alter('verf_entites_options', $referenceable_entities);
+    return $referenceable_entities;
   }
 
   /**
