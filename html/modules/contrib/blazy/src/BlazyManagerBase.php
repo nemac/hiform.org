@@ -291,7 +291,7 @@ abstract class BlazyManagerBase implements BlazyManagerInterface {
    */
   public function getIoSettings(array $attach = []) {
     $io = [];
-    $thold = trim($this->configLoad('io.threshold'));
+    $thold = trim($this->configLoad('io.threshold') ?? "") ?: '0';
     $thold = str_replace(['[', ']'], '', $thold ?: '0');
 
     // @todo re-check, looks like the default 0 is broken sometimes.
