@@ -1,10 +1,12 @@
 name: HiForM
 type: theme
 description: Simple theme for the HiForM website
-core_version_requirement: 9.x
+core_version_requirement: ^9 || ^10
 base theme: classy
 logo: logo-hiform.png
 libraries:
   - hiform/global-styling
   - hiform/fonts
   - hiform/slick-fixes
+dependencies:
+  - classy:classy
