@@ -15,6 +15,11 @@ class SlickDefault extends BlazyDefault {
   /**
    * {@inheritdoc}
    */
+  protected static $id = 'slicks';
+
+  /**
+   * {@inheritdoc}
+   */
   public static function baseSettings() {
     return [
       'optionset'       => 'default',
@@ -47,7 +52,9 @@ class SlickDefault extends BlazyDefault {
       'thumbnail_caption'   => '',
       'thumbnail_effect'    => '',
       'thumbnail_position'  => '',
-    ] + self::baseSettings() + parent::imageSettings() + self::gridSettings();
+    ] + self::baseSettings()
+      + self::gridSettings()
+      + parent::imageSettings();
   }
 
   /**
@@ -56,7 +63,8 @@ class SlickDefault extends BlazyDefault {
   public static function extendedSettings() {
     return [
       'thumbnail' => '',
-    ] + self::imageSettings() + parent::extendedSettings();
+    ] + self::imageSettings()
+      + parent::extendedSettings();
   }
 
   /**
@@ -64,7 +72,7 @@ class SlickDefault extends BlazyDefault {
    */
   public static function filterSettings() {
     $settings = self::imageSettings();
-    $unused = self::gridSettings() + [
+    $unused = [
       'breakpoints' => [],
       'sizes'       => '',
       'grid_header' => '',
@@ -74,7 +82,25 @@ class SlickDefault extends BlazyDefault {
         unset($settings[$key]);
       }
     }
-    return $settings;
+    return $settings + self::gridSettings();
+  }
+
+  /**
+   * Returns Slick specific settings.
+   */
+  public static function slicks() {
+    return [
+      'breaking'      => FALSE,
+      'display'       => 'main',
+      'library'       => 'slick',
+      // 'nav'           => FALSE,
+      // 'navpos'        => FALSE,
+      'thumbnail_uri' => '',
+      'unslick'       => FALSE,
+      'vanilla'       => FALSE,
+      'vertical'      => FALSE,
+      'vertical_tn'   => FALSE,
+    ];
   }
 
   /**
@@ -85,23 +111,15 @@ class SlickDefault extends BlazyDefault {
    */
   public static function htmlSettings() {
     return [
-      'breaking'      => FALSE,
-      'display'       => 'main',
-      'grid'          => 0,
-      'id'            => '',
-      'lazy'          => '',
-      'library'       => 'slick',
-      'namespace'     => 'slick',
-      'nav'           => FALSE,
-      'navpos'        => FALSE,
-      'thumbnail_uri' => '',
-      'route_name'    => '',
-      'unslick'       => FALSE,
-      'vanilla'       => FALSE,
-      'vertical'      => FALSE,
-      'vertical_tn'   => FALSE,
-      'view_name'     => '',
-    ] + self::imageSettings();
+      // @todo remove post 2.17:
+      // 'slicks' => \blazy()->settings(self::values()),
+      // @todo remove after migrations.
+      'item_id'   => 'slide',
+      'namespace' => 'slick',
+      // @todo remove `+ self::slicks()`.
+    ] + self::slicks()
+      + self::imageSettings()
+      + parent::htmlSettings();
   }
 
   /**
@@ -130,38 +148,36 @@ class SlickDefault extends BlazyDefault {
    */
   public static function themeProperties() {
     return [
-      'attached',
-      'attributes',
-      'items',
-      'options',
-      'optionset',
-      'settings',
+      'attached' => [],
+      'attributes' => [],
+      'items' => [],
+      'options' => [],
+      'optionset' => NULL,
+      'settings' => [],
     ];
   }
 
   /**
-   * Returns a wrapper to pass tests, or DI where adding params is troublesome.
-   *
-   * @todo remove for Blazy::pathResolver() post Blazy:2.6+.
+   * Verify the settings.
    */
-  public static function pathResolver() {
-    return \Drupal::hasService('extension.path.resolver') ? \Drupal::service('extension.path.resolver') : NULL;
+  public static function verify(array &$settings, $manager): void {
+    $config = $settings['slicks'] ?? NULL;
+    if (!$config) {
+      $settings += self::htmlSettings();
+      $config = $settings['slicks'];
+    }
+
+    if (!$config->get('ui')) {
+      $ui = $manager->configMultiple('slick.settings');
+      $config->set('ui', $ui);
+    }
   }
 
   /**
-   * Returns the commonly used path, or just the base path.
-   *
-   * @todo remove drupal_get_path check when min D9.3.
+   * {@inheritdoc}
    */
-  public static function getPath($type, $name, $absolute = FALSE): string {
-    $function = 'drupal_get_path';
-    if ($resolver = self::pathResolver()) {
-      $path = $resolver->getPath($type, $name);
-    }
-    else {
-      $path = is_callable($function) ? $function($type, $name) : '';
-    }
-    return $absolute ? \base_path() . $path : $path;
+  protected static function values(): array {
+    return self::slicks();
   }
 
 }

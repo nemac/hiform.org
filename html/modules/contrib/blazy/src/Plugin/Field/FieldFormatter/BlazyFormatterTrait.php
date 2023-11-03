@@ -2,6 +2,9 @@
 
 namespace Drupal\blazy\Plugin\Field\FieldFormatter;
 
+use Drupal\blazy\Field\BlazyField;
+use Drupal\blazy\internals\Internals;
+use Drupal\blazy\Traits\PluginScopesTrait;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -9,10 +12,13 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  */
 trait BlazyFormatterTrait {
 
+  use PluginScopesTrait;
+  use BlazyFormatterViewTrait;
+
   /**
    * The blazy manager service.
    *
-   * @var \Drupal\blazy\BlazyFormatterManager
+   * @var \Drupal\blazy\BlazyFormatterInterface
    */
   protected $formatter;
 
@@ -24,7 +30,44 @@ trait BlazyFormatterTrait {
   protected $blazyManager;
 
   /**
+   * The blazy-related manager service.
+   *
+   * @var \Drupal\blazy\BlazyManagerInterface
+   */
+  protected $manager;
+
+  /**
+   * The logger factory.
+   *
+   * @var \Drupal\Core\Logger\LoggerChannelFactoryInterface
+   */
+  protected $loggerFactory;
+
+  /**
+   * The blazy entity service.
+   *
+   * @var \Drupal\blazy\BlazyEntityInterface
+   */
+  protected $blazyEntity;
+
+  /**
+   * The blazy oembed service.
+   *
+   * @var \Drupal\blazy\Media\BlazyOEmbedInterface
+   */
+  protected $blazyOembed;
+
+  /**
+   * The blazy media service.
+   *
+   * @var \Drupal\blazy\Media\BlazyMediaInterface
+   */
+  protected $blazyMedia;
+
+  /**
    * Returns the blazy formatter manager.
+   *
+   * @todo remove at 3.x, hardly called outside the formatters, except tests.
    */
   public function formatter() {
     return $this->formatter;
@@ -32,9 +75,38 @@ trait BlazyFormatterTrait {
 
   /**
    * Returns the blazy manager.
+   *
+   * @todo remove at 3.x, hardly called outside the formatters, except tests.
    */
   public function blazyManager() {
     return $this->blazyManager;
+  }
+
+  /**
+   * Returns any blazy-related manager.
+   *
+   * @todo remove at 3.x, hardly called outside the formatters, except tests.
+   */
+  public function manager() {
+    return $this->manager;
+  }
+
+  /**
+   * Returns the blazy entity manager.
+   *
+   * @todo remove at 3.x, hardly called outside the formatters, except tests.
+   */
+  public function blazyEntity() {
+    return $this->blazyEntity;
+  }
+
+  /**
+   * Returns the blazy oembed manager.
+   *
+   * @todo remove at 3.x, hardly called outside the formatters, except tests.
+   */
+  public function blazyOembed() {
+    return $this->blazyOembed;
   }
 
   /**
@@ -42,25 +114,6 @@ trait BlazyFormatterTrait {
    */
   public function admin() {
     return \Drupal::service('blazy.admin.formatter');
-  }
-
-  /**
-   * Injects DI services.
-   */
-  protected static function injectServices($instance, ContainerInterface $container, $type = '') {
-    $instance->formatter = $instance->blazyManager = $container->get('blazy.formatter');
-
-    // Provides optional services.
-    if ($type == 'image' || $type == 'entity') {
-      $instance->imageFactory = $instance->imageFactory ?? $container->get('image.factory');
-      if ($type == 'entity') {
-        $instance->loggerFactory = $instance->loggerFactory ?? $container->get('logger.factory');
-        $instance->blazyEntity = $instance->blazyEntity ?? $container->get('blazy.entity');
-        $instance->blazyOembed = $instance->blazyOembed ?? $instance->blazyEntity->oembed();
-      }
-    }
-
-    return $instance;
   }
 
   /**
@@ -75,38 +128,124 @@ trait BlazyFormatterTrait {
    */
   public function buildSettings() {
     $settings = array_merge($this->getCommonFieldDefinition(), $this->getSettings());
-    $settings['blazy'] = TRUE;
-    $settings['item_id'] = $settings['lazy'] = 'blazy';
-    $settings['_grid'] = !empty($settings['style']) && !empty($settings['grid']);
-    $settings['third_party'] = $this->getThirdPartySettings();
+    $blazies  = $settings['blazies'];
+    $multiple = $this->isMultiple();
+    $is_grid  = !empty($settings['style']) && !empty($settings['grid']);
 
-    // Exposes few basic formatter settings w/o use_field.
-    $settings['label'] = $this->fieldDefinition->getLabel();
-    $settings['label_display'] = $this->label;
+    // Since 2.17, the item array was to replace all sub-modules theme_ITEM() by
+    // theme_blazy() for easy improvements at 3.x, optional via Blazy UI.
+    $namespace = static::$namespace ?? 'blazy';
+    $blazies->set('is.grid', $is_grid && $multiple)
+      ->set('is.multiple', $multiple)
+      ->set('item.id', static::$itemId ?? 'slide')
+      ->set('item.prefix', static::$itemPrefix ?? 'slide')
+      ->set('item.caption', static::$captionId ?? 'caption')
+      ->set('namespace', $blazies->get('namespace', $namespace));
+
+    $this->pluginSettings($blazies, $settings);
+
     return $settings;
+  }
+
+  /**
+   * Defines the scope for the form elements.
+   *
+   * Since 2.10 sub-modules can forget this, and use self::getPluginScopes().
+   */
+  public function getScopedFormElements() {
+    // Containing settings, blazies which must be intact, and the rest, which
+    // can be removed after migrations, are merged into scopes object.
+    $commons = $this->getCommonScopedFormElements();
+
+    // Compat for BVEF till updated to adopt Blazy 2.10 BlazyVideoFormatter.
+    $scopes = method_exists($this, 'getPluginScopes')
+      ? $this->getPluginScopes() : [];
+
+    // @todo remove `$scopes +` at Blazy 3.x, leaving only settings + blazies.
+    $definitions = $scopes + $commons;
+    $definitions['scopes'] = $this->toPluginScopes($scopes + $commons);
+    return $definitions;
+  }
+
+  /**
+   * Injects DI services.
+   */
+  protected static function injectServices($instance, ContainerInterface $container, $type = '') {
+    // Blazy has sequential inheritance, its sub-modules deviate.
+    $instance->formatter = $instance->blazyManager = $instance->manager = $container->get('blazy.formatter');
+    $instance->loggerFactory = $instance->loggerFactory ?? $container->get('logger.factory');
+
+    // Provides optional services.
+    if ($type == 'entity') {
+      $instance->blazyEntity = $instance->blazyEntity ?? $container->get('blazy.entity');
+      $instance->blazyOembed = $instance->blazyOembed ?? $instance->blazyEntity->oembed();
+      $instance->blazyMedia  = $instance->blazyMedia ?? $instance->blazyOembed->blazyMedia();
+    }
+
+    return $instance;
   }
 
   /**
    * Defines the common scope for both front and admin.
    */
-  public function getCommonFieldDefinition() {
+  protected function getCommonFieldDefinition() {
     $field = $this->fieldDefinition;
-    return [
-      'namespace'        => 'blazy',
-      'current_view_mode' => $this->viewMode,
-      'field_name'        => $field->getName(),
-      'field_type'        => $field->getType(),
-      'entity_type'       => $field->getTargetEntityTypeId(),
-      'plugin_id'         => $this->getPluginId(),
-      'target_type'       => $this->getFieldSetting('target_type'),
+    $settings = [
+      'namespace' => static::$namespace ?? 'blazy',
     ];
+
+    // Exposes few basic formatter settings w/o use_field.
+    $data = [
+      'label_display' => $this->label,
+      'plugin_id'     => $this->getPluginId(),
+      'third_party'   => $this->getThirdPartySettings(),
+      'view_mode'     => $this->viewMode,
+      'formatter'     => array_filter($this->getSettings()),
+    ];
+
+    return BlazyField::settings($settings, $field, $data);
   }
 
   /**
    * Defines the common scope for the form elements.
    */
-  public function getCommonScopedFormElements() {
-    return ['settings' => $this->getSettings()] + $this->getCommonFieldDefinition();
+  protected function getCommonScopedFormElements() {
+    return ['settings' => $this->getSettings()]
+      + $this->getCommonFieldDefinition();
+  }
+
+  /**
+   * Returns Views delta_limit option.
+   */
+  protected function getViewLimit(array $settings): int {
+    $blazies = $settings['blazies'];
+    return Internals::getViewLimit($blazies);
+  }
+
+  /**
+   * Returns TRUE if a multi-value field.
+   *
+   * @return bool
+   *   TRUE if a multivalue field, else FALSE.
+   */
+  protected function isMultiple(): bool {
+    return $this->fieldDefinition
+      ->getFieldStorageDefinition()
+      ->isMultiple();
+  }
+
+  /**
+   * Alias for BlazyField::getString().
+   */
+  protected function getString($entity, $field_name, $langcode, $clean = TRUE): string {
+    return BlazyField::getString($entity, $field_name, $langcode, $clean);
+  }
+
+  /**
+   * Alias for BlazyField::view().
+   */
+  protected function viewField($entity, $field_name, $view_mode, $multiple = TRUE): array {
+    return BlazyField::view($entity, $field_name, $view_mode, $multiple);
   }
 
 }

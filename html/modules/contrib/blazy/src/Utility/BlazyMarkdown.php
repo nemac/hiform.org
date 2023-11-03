@@ -2,48 +2,17 @@
 
 namespace Drupal\blazy\Utility;
 
-use Drupal\Component\Utility\Xss;
-use Michelf\MarkdownExtra;
-use League\CommonMark\CommonMarkConverter;
+@trigger_error('The ' . __NAMESPACE__ . '\BlazyMarkdown is deprecated in blazy:8.x-2.17 and is removed from blazy:8.x-3.0. Use \Drupal\blazy\BlazyInterface::markdown() instead. See https://www.drupal.org/node/3103018', E_USER_DEPRECATED);
 
 /**
- * Provides markdown utilities only useful for the help text.
+ * Deprecated in blazy:8.x-2.17.
+ *
+ * @internal
+ *   This is an internal part of the Blazy system and should only be used by
+ *   blazy-related code in Blazy module, or its sub-modules.
+ *
+ * @deprecated in blazy:8.x-2.17 and is removed from blazy:3.0.0. Use
+ *   \Drupal\blazy\BlazyInterface::markdown() instead.
+ * @see https://www.drupal.org/node/3103018
  */
-class BlazyMarkdown {
-
-  /**
-   * Checks if we have the needed classes.
-   */
-  public static function isApplicable() {
-    return class_exists('Michelf\MarkdownExtra') || class_exists('League\CommonMark\CommonMarkConverter');
-  }
-
-  /**
-   * Processes Markdown text, and convert into HTML suitable for the help text.
-   *
-   * @param string $string
-   *   The string to apply the Markdown filter to.
-   * @param bool $sanitize
-   *   True, if the string should be sanitized.
-   *
-   * @return string
-   *   The filtered, or raw converted string.
-   */
-  public static function parse($string = '', $sanitize = TRUE) {
-    if (!self::isApplicable()) {
-      return '<pre>' . $string . '</pre>';
-    }
-
-    if (class_exists('Michelf\MarkdownExtra')) {
-      $string = MarkdownExtra::defaultTransform($string);
-    }
-    elseif (class_exists('League\CommonMark\CommonMarkConverter')) {
-      $converter = new CommonMarkConverter();
-      $string = $converter->convertToHtml($string);
-    }
-
-    // We do not pass it to FilterProcessResult, as this is meant simple.
-    return $sanitize ? Xss::filterAdmin($string) : $string;
-  }
-
-}
+class BlazyMarkdown extends Markdown {}

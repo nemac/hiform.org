@@ -1,5 +1,4 @@
 ***
-***
 
 ## <a name="contribution"></a>SUBMITTING PATCHES OR ISSUES
 Please use the provided issue template to help you explain better, and to help
@@ -63,7 +62,7 @@ For the Slick library bug, please report it to:
   [Slick library](https://github.com/kenwheeler/slick)
 
 You can create a fiddle to isolate the bug if reproduceable outside the module:
-  [Fiddle](http://jsfiddle.net/)
+  [Fiddle](https://jsfiddle.net/)
 
 For the support requests, a screenshot of the output and Slick form are helpful.
 Shortly, you should kindly help the maintainers with detailed info to help you.

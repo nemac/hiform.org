@@ -39,7 +39,7 @@ class BlazyEntityTest extends BlazyKernelTestBase {
    * @param bool $expected
    *   The expected output.
    *
-   * @covers ::getEntityView
+   * @covers ::view
    * @dataProvider providerTestGetEntityView
    */
   public function testGetEntityView($entity, $fallback, $message, $expected) {
@@ -47,13 +47,18 @@ class BlazyEntityTest extends BlazyKernelTestBase {
       $entity = empty($this->entity) ? $this->setUpContentWithItems($this->bundle) : $this->entity;
     }
     elseif ($entity == 'responsive_image') {
-      $entity = $this->blazyManager->entityLoad('blazy_responsive_test', 'responsive_image_style');
+      $entity = $this->blazyManager->load('blazy_responsive_test', 'responsive_image_style');
     }
     elseif ($entity == 'image') {
       $entity = $this->testItem;
     }
 
-    $result = $this->blazyEntity->getEntityView($entity, [], $fallback);
+    $data = [
+      '#entity' => $entity,
+      '#settings' => [],
+      'fallback' => $fallback,
+    ];
+    $result = $this->blazyEntity->view($data);
     $this->assertSame($expected, !empty($result), $message);
   }
 

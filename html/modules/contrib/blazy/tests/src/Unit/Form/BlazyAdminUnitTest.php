@@ -3,8 +3,8 @@
 namespace Drupal\Tests\blazy\Unit\Form;
 
 use Drupal\blazy\Form\BlazyAdmin;
-use Drupal\Tests\UnitTestCase;
 use Drupal\Tests\blazy\Traits\BlazyUnitTestTrait;
+use Drupal\Tests\UnitTestCase;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -26,9 +26,7 @@ class BlazyAdminUnitTest extends UnitTestCase {
     $this->entityDisplayRepository = $this->createMock('\Drupal\Core\Entity\EntityDisplayRepositoryInterface');
     $this->typedConfig = $this->createMock('\Drupal\Core\Config\TypedConfigManagerInterface');
     $this->blazyManager = $this->createMock('\Drupal\blazy\BlazyManagerInterface');
-    $this->dateFormatter = $this->getMockBuilder('Drupal\Core\Datetime\DateFormatter')
-      ->disableOriginalConstructor()
-      ->getMock();
+    $this->dateFormatter = $this->createMock('\Drupal\Core\Datetime\DateFormatter');
   }
 
   /**
@@ -49,6 +47,7 @@ class BlazyAdminUnitTest extends UnitTestCase {
       ['blazy.manager', $exception, $this->blazyManager],
     ];
 
+    /* @phpstan-ignore-next-line */
     $container->expects($this->any())
       ->method('get')
       ->willReturnMap($map);

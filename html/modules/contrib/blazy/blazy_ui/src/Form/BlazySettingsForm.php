@@ -2,42 +2,37 @@
 
 namespace Drupal\blazy_ui\Form;
 
-use Drupal\Core\Url;
-use Drupal\Core\Form\ConfigFormBase;
+use Drupal\blazy\Blazy;
+use Drupal\blazy\Form\BlazyConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
-use Symfony\Component\DependencyInjection\ContainerInterface;
+use Drupal\Core\Url;
 
 /**
  * Defines blazy admin settings form.
  */
-class BlazySettingsForm extends ConfigFormBase {
-
-  /**
-   * The library discovery service.
-   *
-   * @var \Drupal\Core\Asset\LibraryDiscoveryInterface
-   */
-  protected $libraryDiscovery;
-
-  /**
-   * The blazy manager service.
-   *
-   * @var \Drupal\blazy\BlazyManagerInterface
-   */
-  protected $manager;
+class BlazySettingsForm extends BlazyConfigFormBase {
 
   /**
    * {@inheritdoc}
    */
-  public static function create(ContainerInterface $container) {
-    /**
-     * @var \Drupal\blazy_ui\Form\BlazySettingsForm
-     */
-    $instance = parent::create($container);
-    $instance->libraryDiscovery = $container->get('library.discovery');
-    $instance->manager = $container->get('blazy.manager');
-    return $instance;
-  }
+  protected $validatedOptions = [
+    'placeholder',
+    'unstyled_extensions',
+    ['blazy', 'container'],
+    ['blazy', 'offset'],
+    ['blazy', 'saveViewportOffsetDelay'],
+    ['blazy', 'validateDelay'],
+    ['io', 'rootMargin'],
+    ['io', 'threshold'],
+    'extras',
+  ];
+
+  /**
+   * {@inheritdoc}
+   */
+  protected $validatedPaths = [
+    'placeholder',
+  ];
 
   /**
    * {@inheritdoc}
@@ -58,12 +53,104 @@ class BlazySettingsForm extends ConfigFormBase {
    */
   public function buildForm(array $form, FormStateInterface $form_state) {
     $config = $this->config('blazy.settings');
+    $doms = ['DOMPurify', 'dompurify'];
+    $dom_exists = $exists = $this->manager->getLibrariesPath($doms);
+    $svg_exists = $exists = Blazy::svgSanitizerExists();
+    $svg_sanitizer = 'https://github.com/darylldoyle/svg-sanitizer';
+    $class = $exists ? 'info' : 'warning';
+    $hints = [];
+
+    // Adapted from Colorbox module, thanks.
+    $dom_text = $dom_exists ?
+      '[v] ' . $this->t('The DOMPurify library is installed to sanitize lightbox captions. Be sure to clear cache for library discoveries. [<a href=":ui">Blazy UI help</a>]', [
+        ':ui' => '/admin/help/blazy_ui#dompurify',
+      ])
+      :
+      '[x] ' . $this->t('<strong>Warning!</strong> The <a href=":url">DOMPurify</a> library is not installed. It is necessary for HTML in lightbox captions. Without it, they are only sanitized server-side, or builtin. [<a href=":ui">Blazy UI help</a>].',
+        [
+          ':url' => 'https://github.com/cure53/DOMPurify/archive/main.zip',
+          ':ui' => '/admin/help/blazy_ui#dompurify',
+        ]);
+
+    $hints[] = [
+      '#theme' => 'container',
+      '#children'   => ['#markup' => $dom_text],
+      // '#attributes' => [
+      // 'class' => ['messages', 'messages--' .
+      // ($dom_exists ? 'info' : 'warning')],
+      // ],
+    ];
+
+    $svg_text = $svg_exists ?
+      '[v] ' . $this->t('The SVG Sanitizer library is installed to sanitize inline SVG. [<a href=":ui">Blazy UI help</a>]', [
+        ':ui' => '/admin/help/blazy_ui#svg',
+      ])
+      :
+      '[x] ' . $this->t('<strong>Warning!</strong> The <a href=":url">SVG Sanitizer</a> library is not installed. This library is necessary if you want to use SVG inline. Without it, the world would be ended. [<a href=":ui">Blazy UI help</a>].',
+        [
+          ':url' => $svg_sanitizer,
+          ':ui' => '/admin/help/blazy_ui#svg',
+        ]);
+
+    $hints[] = [
+      '#theme' => 'container',
+      '#children'   => ['#markup' => $svg_text],
+      // '#attributes' => [
+      // 'class' => ['messages', 'messages--' .
+      // ($svg_exists ? 'info' : 'warning')],
+      // ],
+    ];
+
+    $form['library_hints'] = [
+      // '#theme' => 'item_list',
+      // '#items' => $hints,
+      '#type' => 'container',
+      'items' => $hints,
+      '#attributes' => [
+        'class' => [
+          'messages-list__item ',
+          'messages',
+          'messages--' . $class,
+        ],
+      ],
+      '#wrapper_attributes' => ['class' => ['messages-list']],
+    ];
 
     $form['admin_css'] = [
       '#type'          => 'checkbox',
       '#title'         => $this->t('Admin CSS'),
       '#default_value' => $config->get('admin_css'),
       '#description'   => $this->t('Uncheck to disable blazy related admin compact form styling, only if not compatible with your admin theme.'),
+    ];
+
+    $form['use_theme_blazy'] = [
+      '#type'          => 'checkbox',
+      '#title'         => $this->t('Use theme_blazy()'),
+      '#description'   => $this->t('Check to use theme_blazy() specific for sub-modules theme_ITEM() (theme_slick_slide(), theme_splide_slide(), theme_gridstack_box(), etc.) contents with images/media along with their captions. This will be forced at blazy:3.x. You can help starting the migrations by enabling this to spot problems. If any issues, please disable and report for fixes, <a href=":url">read more</a>.', [
+        ':url' => '/admin/help/blazy_ui#theme-blazy',
+      ]),
+      '#default_value' => $config->get('use_theme_blazy'),
+    ];
+
+    $form['use_oembed'] = [
+      '#type'          => 'checkbox',
+      '#title'         => $this->t('Use oEmbed'),
+      '#description'   => $this->t('Check to use oEmbed when available. Only relevant for VEF compatibility which already managed their embed codes. Irrelevant for core which already uses oEmbed. If checked, VEF embed will be converted into oEmbed if the provider is available, otherwise left as is. Be informed! Using oEmbed may require having App ID and secret credentials for some providers even for simple oEmbed read such as Instagram or Facebook, not Youtube, etc.'),
+      '#default_value' => $config->get('use_oembed'),
+    ];
+
+    $form['lazy_html'] = [
+      '#type'          => 'checkbox',
+      '#title'         => $this->t('Lazy load HTML (Experimental)'),
+      '#description'   => $this->t('When theme_blazy() does not understand a media output, it will print it as HTML as is. This HTML is normally a paragraph size. Check this to lazy load such HTML content (normally heavy third party contents, like oembed Instagram, Pinterest, etc.), no AJAX, otherwise printed as is. A new feature since 2.17, not battle-tested. Potential issues are with the attached libraries, and other various Blazy features. Please disable and report if any issues.'),
+      '#default_value' => $config->get('lazy_html'),
+    ];
+
+    $form['use_encodedbox'] = [
+      '#type'          => 'checkbox',
+      '#title'         => $this->t('Use encoding for HTML (Experimental)'),
+      '#description'   => $this->t('If checked, and the lightbox supports this feature, the lightbox HTML (normally local audio/video, Picture/Responsive image, oembed Instagram, etc.) will be encoded. Also applies to CSS background. A minor byte saving. Please disable if any issues.'),
+      '#default_value' => $config->get('use_encodedbox'),
     ];
 
     $nojs = $config->get('nojs');
@@ -77,9 +164,11 @@ class BlazySettingsForm extends ConfigFormBase {
         'classlist' => $this->t('classList polyfill (ie9-ie11)'),
         'promise' => $this->t('Promise polyfill (ie11)'),
         'raf' => $this->t('requestAnimationFrame polyfill (ie9)'),
+        'webp' => $this->t('webp fallback (ie9-ie11, old Safari)'),
       ],
       '#default_value' => !empty($nojs) ? array_values((array) $nojs) : [],
-      '#description'   => $this->t("Enable to not load them if you don't support IEs and other oldies, or have polyfills at your theme globally. File sizes approximately in minified gzip. The plus (+) sign refers to dependencies like <code>dblazy.js (~4KB)</code>, etc. A few can be removed via this form. For illustration, Colorbox which is called very lightweight is 4.8KB + jQuery (31KB) = 35.8KB. Blazy never loads all its JavaScript at once, instead conditionally and carefully loads ones as required. Mostly based on your options including these ones. <ul><li><b>Lazyload</b>: remove libraries and loader/ initializer scripts (<code>blazy.js (original: 2.2KB, fork: 1.6KB+), blazy.load.js (1KB+), bio.js (1.7KB+)</code>.) for non-js Native lazy. <br><b>Note!</b> While the above is always valid, a <code>blazy/compat (<1KB + bio.js)</code> and or <code>blazy/dblazy</code> in the least is conditionally loaded as required if any js-dependent options are enabled: <ul><li>Image effect animation or Blur.</li><li>Dynamic multi-breakpoint aka Fluid aspect ratio (excluding fixed ones).</li><li>Dynamic multi-breakpoint (Responsive|Picture based), or static CSS background.</li><li>Local video.</li><li>Sub-module requirements. Slick, Splide, Ultimenu, Jumper, etc. might require <code>blazy/dblazy</code>, not a lazyload script, just common jQuery replacement methods for vanilla ones.</li></ul></li><li><b>Polyfills</b>: Only loaded (total 3.6KB) if the above conditions are met, and left unchecked. Basic polyfills: <code>Object.assign, closest, forEach, matches, startsWith, CustomEvent</code>. For other polyfills, due to questionabe licenses, include them into your theme as needed such as <a href=':io'>IntersectionObserver</a>, etc. </li></ul>As of 2022/1, Native only supports IMG and IFRAME, the exceptions above cover DIV, VIDEO, etc. Other JavaScript (Media Player, Lightbox, Non-css Masonry (Flexbox or Nativegrid), etc.) can already be disabled via Formatters since 1.x. jQuery (31KB) is only loaded for Colorbox (4.8KB) + blazy.colorbox.js (1.2KB+) and admin UIs. Details in blazy/js directory. <a href=':url'>Read more</a>.", [
+      '#description'   => $this->t("Enable to not load them if you don't support IEs and other oldies, or have polyfills at your theme globally. File sizes approximately in minified gzip. The plus (+) sign refers to dependencies like <code>dblazy.js (~4KB)</code>, etc. A few can be removed via this form. For illustration, Colorbox which is called very lightweight is 4.8KB + jQuery (31KB) = 35.8KB. Blazy never loads all its JavaScript at once, instead conditionally and carefully loads ones as required. Mostly based on your options including these ones. <ul><li><b>Lazyload</b>: remove libraries and loader/ initializer scripts (<code>blazy.js (original: 2.2KB, fork: 1.6KB+), blazy.load.js (1KB+), bio.js (1.7KB+)</code>.) for non-js Native lazy. <br><b>Note!</b> While the above is always valid, a <code>blazy/compat (<1KB + bio.js)</code> and or <code>blazy/dblazy</code> in the least is conditionally loaded as required if any js-dependent options are enabled: <ul><li>Image effect animation or Blur.</li><li>Dynamic multi-breakpoint aka Fluid aspect ratio (excluding fixed ones).</li><li>Dynamic multi-breakpoint (Responsive|Picture based), or static CSS background.</li><li>Local video.</li><li>Loading priority: defer.</li><li>Sub-module requirements. Slick, Splide, Ultimenu, Jumper, etc. might require <code>blazy/dblazy</code>, not a lazyload script, just common jQuery replacement methods for vanilla ones.</li></ul></li><li><b>Polyfills</b>: Only loaded (total 3.6KB) if the above conditions are met, and left unchecked. <b>Basic polyfills</b>: <code>Object.assign, closest, forEach, matches, startsWith, CustomEvent</code>. <b>webp falback</b>: FWIW, IE9, not tested against old Safari, works fine with core/picturefill w/o this fallback. For other polyfills, due to questionabe licenses, include them into your theme as needed such as <a href=':io'>IntersectionObserver</a>, etc. <br><b>Warning!</b> The polyfills may be deprecated and removed when <a href=':cash'>Cash DOM</a> module is available, and will be replaced by Cash accordingly.</li></ul>As of 2022/1, Native only supports IMG and IFRAME, the exceptions above cover BLUR, DIV, VIDEO, ratio FLUID, LOADING: defer, etc. Other JavaScript (Media Player, Lightbox, Non-css Masonry (Flexbox or Nativegrid), etc.) can already be disabled via Formatters since 1.x. jQuery (31KB) is only loaded for Colorbox (4.8KB) + blazy.colorbox.js (1.2KB+) and admin UIs. Details in blazy/js directory. <a href=':url'>Read more</a>.", [
+        ':cash' => 'https://drupal.org/project/cash',
         ':url' => 'https://drupal.org/node/3257512',
         ':io' => 'https://github.com/w3c/IntersectionObserver',
       ]),
@@ -92,11 +181,13 @@ class BlazySettingsForm extends ConfigFormBase {
       '#description'   => $this->t('Enable noscript if you want to support <a href=":url">non-javascript users</a>.', [':url' => 'https://stackoverflow.com/questions/9478737']),
     ];
 
+    // @todo remove users's consent at 3.x, should be enough with manual check.
+    // It was an option due to not being fully integrated till likely 2.4+.
     $form['responsive_image'] = [
       '#type'          => 'checkbox',
       '#title'         => $this->t('Support Responsive image'),
       '#default_value' => $config->get('responsive_image'),
-      '#description'   => $this->t('Check to support lazyloading for the core Responsive image module. Be sure to use blazy-related formatters.'),
+      '#description'   => $this->t('(Deprecated in blazy:2.5, and is removed in blazy:3.x for module exists check. It was a user consent option due to not being fully integrated till likely blazy:2.4+ so to disable easily without breaking things). Old description: Check to support lazyloading for the core Responsive image module. Be sure to use blazy-related formatters.'),
       '#disabled'      => !function_exists('responsive_image_get_image_dimensions'),
     ];
 
@@ -104,14 +195,37 @@ class BlazySettingsForm extends ConfigFormBase {
       '#type'          => 'checkbox',
       '#title'         => $this->t('Responsive image 1px placeholder'),
       '#default_value' => $config->get('one_pixel'),
-      '#description'   => $this->t('By default a 1px Data URI image is the placeholder for lazyloaded Responsive image. Useful to perform a lot better. Uncheck to disable, and use Drupal-managed smallest/fallback image style instead. Be sure to add proper dimensions or at least min-height/min-width via CSS accordingly to avoid layout reflow, or choose an Aspect ratio via Blazy formatters. Disabling this will result in downloading fallback image as well for non-PICTURE element (double downloads), unless <code>empty image</code> is selected for fallback at Responsive image style UI.'),
+      '#description'   => $this->t('By default a 1px Data URI image is the placeholder for lazyloaded (Responsive) image. Useful to perform a lot better. Uncheck to disable, and use Drupal-managed smallest/fallback image style instead. Be sure to add proper dimensions or at least min-height/min-width via CSS accordingly to avoid layout reflow, or choose an Aspect ratio via Blazy formatters. <br>Since <b>2.10</b>, disabling this will no longer result in downloading fallback image (double downloads). Thus, allows you to have non <code>empty image</code> for fallback at Responsive image style UI without extra HTTP requests, while using <code>empty image</code> (enforced now) for the SRC. Basically marrying those options. not negating each other anymore.'),
+    ];
+
+    $form['visible_class'] = [
+      '#type'          => 'checkbox',
+      '#title'         => $this->t('Add is-b-visible class'),
+      '#default_value' => $config->get('visible_class'),
+      '#description'   => $this->t('Add <code>is-b-visible</code> CSS class when entering the viewport. Only enable if any real use for animating anything, otherwise disable it. If enabled, IO is not destroyed so to keep watching the class changes.'),
+    ];
+
+    $form['wrapper_class'] = [
+      '#type'          => 'checkbox',
+      '#title'         => $this->t('Remove field/ view wrapper classes'),
+      '#default_value' => $config->get('wrapper_class'),
+      '#description'   => $this->t("Remove useful classes for DOM diets when you can get rid of Field, Block, Views, etc. wrappers so you have context for styling. Other required classes: lightbox, grid, etc. are intact if so-configured."),
+    ];
+
+    $form['deprecated_class'] = [
+      '#type'          => 'checkbox',
+      '#title'         => $this->t('Remove deprecated classes'),
+      '#default_value' => $config->get('deprecated_class'),
+      '#description'   => $this->t("Remove some legacy Foundation CSS grid classes to avoid conflict with core block, e.g: block-nativegrid for b-nativegrid, etc. CHECK if not using those classes, or to avoid themers using them. Leave it UNCHECKED if using them till you update them. See <a href=':url'>Notable changes</a> for details. Be sure to clear cache!", [
+        ':url' => '/admin/help/blazy_ui#changes',
+      ]),
     ];
 
     $form['placeholder'] = [
       '#type'          => 'textfield',
       '#title'         => $this->t('Placeholder'),
       '#default_value' => $config->get('placeholder'),
-      '#description'   => $this->t("Overrides global 1px placeholder. Can be URL, e.g.: /blank.gif or /blank.svg. Be warned: unlike .svg, browsers have display issues with 1px .gif, see <a href=':url1'>#2795415</a>. Only useful if continuously using Views rewrite results, see <a href=':url2'>#2908861</a>. Alternatively use <code>hook_blazy_settings_alter()</code> for more fine-grained control. Leave it empty to use default inline SVG or Data URI to avoid extra HTTP requests. If you have 100 images on a page, you will save 100 extra HTTP requests by leaving it empty. The <b>blank.svg</b> content sample if not using blank.gif: <br><code>&lt;svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'/&gt;</code><br>Save it at Drupal web root as <code>blank.svg</code>, and reference it as <code>/blank.svg</code> in the Placeholder field.", [
+      '#description'   => $this->t("Only useful if continuously using Views rewrite results, see <a href=':url2'>#2908861</a>. Inputting this means having trouble with `data:image` placeholder being stripped out by Views sanitization procedures causing 404. Will override global 1px `data:image` placeholder, including core Responsive image 1px `data:image` with this so to avoid 404, and independent from the previous `Responsive image 1px placeholder` option. Must be URL, e.g.: /blank.gif or /blank.svg. Be warned: unlike .svg, browsers have display issues with 1px .gif, see <a href=':url1'>#2795415</a>. Alternatively use <code>hook_blazy_settings_alter()</code> for more fine-grained control. Leave it empty to use default inline SVG or Data URI to avoid extra HTTP requests. If you have 100 images on a page, you will save hammering your server with 100 extra HTTP requests by leaving it empty. The <b>blank.svg</b> content sample if not using blank.gif: <br><code>&lt;svg xmlns='https://www.w3.org/2000/svg' viewBox='0 0 100 100'/&gt;</code><br>Save it at Drupal web root as <code>blank.svg</code>, and reference it as <code>/blank.svg</code> in the Placeholder field.", [
         ':url1' => 'https://drupal.org/node/2795415',
         ':url2' => 'https://drupal.org/node/2908861',
       ]),
@@ -124,28 +238,67 @@ class BlazySettingsForm extends ConfigFormBase {
       '#description'   => $this->t('Extensions that should not use (Responsive) image style, space delimited without dot, e.g.: <code>gif apng</code> <br>Normally animated images. No way to distinguish animated from static gif, it is all or nothing. This means no thumbnail, no blur, nor features which makes use image style. Default to svg.'),
     ];
 
+    $fx = $this->manager->getImageEffects();
     $form['fx'] = [
       '#type'          => 'select',
       '#title'         => $this->t('Image effect'),
       '#empty_option'  => '- None -',
-      '#options'       => $this->manager->getImageEffects(),
+      '#options'       => array_combine($fx, $fx),
       '#default_value' => $config->get('fx'),
-      '#description'   => $this->t('Choose the image effect. Will use Thumbnail style option at Blazy formatters for the placeholder with fallback to core Thumbnail style. For best results: use similar aspect ratio for both Thumbnail and Image styles; adjust Offset and or threshold; the smaller the better. Use <code>hook_blazy_image_effects_alter()</code> to add more effects -- curtain, fractal, slice, whatever. <b>Limitations</b>: Best with a proper Aspect ratio option as otherwise collapsed image. Be sure to add one. If not, add regular CSS <code>min-height</code> for each mediaquery. The Placeholder option is still respected. Is it still relevant for Native lazyload? You decide. The name is `Native lazyload`, not `Native load`.'),
+      '#description'   => $this->t("Choose the image effect. Will use Thumbnail style option at Blazy formatters for the placeholder with fallback to core Thumbnail style. For best results: use similar aspect ratio for both Thumbnail and Image styles; adjust Offset and or threshold; the smaller the better. Use <code>hook_blazy_image_effects_alter()</code> to add more effects -- curtain, fractal, slice, whatever. <b>Limitations</b>: Best with a proper Aspect ratio option as otherwise collapsed image. Be sure to add one. If not, add regular CSS <code>min-height</code> for each mediaquery. The Placeholder option is still respected. It is permanently cached, be sure to clear cache if your or a module's provided additional altered data do not appear here. <ul><li>To avoid complications, it will be disabled when being unlazy: no JS, iframe only, sandboxed, etc. since it requires lazy load as a trigger.</li></ul>"),
     ];
+
+    $form['blur_client'] = [
+      '#type'          => 'checkbox',
+      '#title'         => $this->t('Use client-side blur'),
+      '#default_value' => $config->get('blur_client'),
+      '#description'   => $this->t("Uncheck to preserve old behaviors data URI printed on the page server-side. Check to enable Blur client-side. <br><b>Pros:</b> Client-side doesn't add ugly data URI to the page till required, and automatically cleared when done, meaning lighter page weight at initial and end, and at the next pages if any stored data found (meaning cacheable unlike server-side), but not during runtime animation. It leverages lazy load mechanism. <br><b>Cons:</b> Client-side does a HTTP request initially. Can use localStorage option below to cache them."),
+    ];
+
+    $form['blur_storage'] = [
+      '#type'          => 'checkbox',
+      '#title'         => $this->t('Store blur in localStorage'),
+      '#default_value' => $config->get('blur_storage'),
+      '#description'   => $this->t('Check to cache Blur data URI in localStorage to save HTTP requests on the next requests. Uncheck if using localStorage for more custom important stuffs. Core localStorage providers vary 0.05KB - 150KB, to a tentative amount of 739.07 KB. This option will obviously hit the limit anytime (says 40KB x 100 images = 4000KB), can be larger given non-optimized or large Blur image style. However, configurable at <b>Thumbnail style</b> option, or Responsive image style fallback. That is why the smaller, file size and dimension, the more efficient. Will auto-clear, and recycle, when the quota (2-10MB) is exceeded.'),
+    ];
+
+    $form['blur_minwidth'] = [
+      '#type'          => 'number',
+      '#title'         => $this->t('Blur min-width'),
+      '#default_value' => $config->get('blur_minwidth') ?: 0,
+      '#description'   => $this->t("Only enable Blur if the image style (not window) width is bigger than this value. Useful to disable it for mobile to avoid potential unverified OOM (Out of Memory) issues, or non-fancy listing thumbnails, says 767."),
+      '#maxlength'     => 4,
+      '#field_suffix'  => 'px',
+    ];
+
+    foreach (['client', 'storage', 'minwidth'] as $key) {
+      $form['blur_' . $key]['#states'] = [
+        'visible' => [
+          'select[name="fx"]' => ['value' => 'blur'],
+        ],
+      ];
+      if ($key == 'storage') {
+        $form['blur_' . $key]['#states']['visible'][] = [
+          'input[name="blur_client"]' => [
+            'checked' => TRUE,
+          ],
+        ];
+      }
+    }
 
     $form['blazy'] = [
       '#type'        => 'details',
       '#tree'        => TRUE,
       '#open'        => TRUE,
       '#title'       => $this->t('Blazy settings'),
-      '#description' => $this->t('The following settings are related to Blazy library.'),
+      '#description' => $this->t('The following settings are related to old bLazy library.'),
     ];
 
     $form['blazy']['loadInvisible'] = [
       '#type'          => 'checkbox',
       '#title'         => $this->t('Load invisible'),
       '#default_value' => $config->get('blazy.loadInvisible'),
-      '#description'   => $this->t('Check if you want to load invisible (hidden) elements.'),
+      '#description'   => $this->t('Check if you want to load invisible (hidden) elements. If any issues with tabs, accordions, or anything hidden, enable this.'),
     ];
 
     $form['blazy']['offset'] = [
@@ -190,7 +343,7 @@ class BlazySettingsForm extends ConfigFormBase {
       '#tree'        => TRUE,
       '#open'        => TRUE,
       '#title'       => $this->t('Intersection Observer API (IO) settings'),
-      '#description' => $this->t('Will fallback gracefully with Native support for old browsers using old bLazy fork, unless unloaded. Works absurdly fine at IE9. None essential features like Blur, etc. which require additional polyfills (dataset, etc.) not included above may not. <br>The following settings are related to <a href=":url">IntersectionObserver API</a>.', [':url' => 'https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API']),
+      '#description' => $this->t('Will fallback gracefully with Native support for old browsers using old bLazy fork, unless unloaded. Works absurdly fine at IE9. None essential features like Blur, etc. which require additional polyfills (dataset, etc.) not included above may not, and fail silently instead. <br>The following settings are related to <a href=":url">IntersectionObserver API</a>.', [':url' => 'https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API']),
     ];
 
     $form['io']['unblazy'] = [
@@ -244,13 +397,23 @@ class BlazySettingsForm extends ConfigFormBase {
     $config = $this->configFactory->getEditable('blazy.settings');
     $config
       ->set('admin_css', $form_state->getValue('admin_css'))
+      ->set('lazy_html', $form_state->getValue('lazy_html'))
       ->set('nojs', $form_state->getValue('nojs'))
       ->set('fx', $form_state->getValue('fx'))
+      ->set('blur_client', $form_state->getValue('blur_client'))
+      ->set('blur_storage', $form_state->getValue('blur_storage'))
+      ->set('blur_minwidth', $form_state->getValue('blur_minwidth'))
       ->set('noscript', $form_state->getValue('noscript'))
       ->set('responsive_image', $form_state->getValue('responsive_image'))
       ->set('one_pixel', $form_state->getValue('one_pixel'))
+      ->set('visible_class', $form_state->getValue('visible_class'))
+      ->set('wrapper_class', $form_state->getValue('wrapper_class'))
+      ->set('deprecated_class', $form_state->getValue('deprecated_class'))
       ->set('placeholder', $form_state->getValue('placeholder'))
       ->set('unstyled_extensions', $form_state->getValue('unstyled_extensions'))
+      ->set('use_encodedbox', $form_state->getValue('use_encodedbox'))
+      ->set('use_theme_blazy', $form_state->getValue('use_theme_blazy'))
+      ->set('use_oembed', $form_state->getValue('use_oembed'))
       ->set('blazy.loadInvisible', $form_state->getValue([
         'blazy',
         'loadInvisible',

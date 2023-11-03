@@ -13,8 +13,13 @@ function slick_requirements($phase) {
     return [];
   }
 
+  $exists = FALSE;
+
+  /* @phpstan-ignore-next-line */
   $path = slick('skin')->getSlickPath();
-  $exists = $path ? is_file($path . '/slick/slick.min.js') : FALSE;
+  if (is_dir($path)) {
+    $exists = is_file($path . '/slick/slick.min.js');
+  }
 
   if (slick('skin')->config('library') == 'accessible-slick') {
     $name = 'Accessible Slick';
@@ -45,12 +50,23 @@ function slick_requirements($phase) {
 }
 
 /**
+ * Implements hook_uninstall().
+ */
+function slick_uninstall() {
+  blazy_filter_cleanup('slick');
+}
+
+/**
  * Added pauseOnFocus option.
  */
 function slick_update_8201() {
-  $config = \Drupal::configFactory()->getEditable('slick.optionset.default');
-  $config->set('options.settings.pauseOnFocus', TRUE);
-  $config->save(TRUE);
+  $config_factory = \Drupal::configFactory();
+  foreach ($config_factory->listAll('slick.optionset.') as $optionset_name) {
+    $config = $config_factory->getEditable($optionset_name);
+    $config->set('options.settings.pauseOnFocus', TRUE);
+
+    $config->save(TRUE);
+  }
 }
 
 /**
@@ -108,13 +124,23 @@ function slick_update_8206() {
  * Added new options provided by Accessible Slick library.
  */
 function slick_update_8207() {
-  $config = \Drupal::configFactory()->getEditable('slick.optionset.default');
-  $config->set('options.settings.regionLabel', 'carousel');
-  $config->set('options.settings.useGroupRole', TRUE);
-  $config->set('options.settings.instructionsText', '');
-  $config->set('options.settings.useAutoplayToggleButton', TRUE);
-  $config->set('options.settings.pauseIcon', 'slick-pause-icon');
-  $config->set('options.settings.playIcon', 'slick-play-icon');
-  $config->set('options.settings.arrowsPlacement', '');
-  $config->save(TRUE);
+  $config_factory = \Drupal::configFactory();
+  foreach ($config_factory->listAll('slick.optionset.') as $optionset_name) {
+    $config = $config_factory->getEditable($optionset_name);
+    $config->set('options.settings.regionLabel', 'carousel');
+    $config->set('options.settings.useGroupRole', TRUE);
+    $config->set('options.settings.instructionsText', '');
+    $config->set('options.settings.useAutoplayToggleButton', TRUE);
+    $config->set('options.settings.pauseIcon', 'slick-pause-icon');
+    $config->set('options.settings.playIcon', 'slick-play-icon');
+    $config->set('options.settings.arrowsPlacement', '');
+    $config->save(TRUE);
+  }
+}
+
+/**
+ * Matching a more relevant module version.
+ */
+function slick_update_8210() {
+  // Do nothing to clear cache.
 }

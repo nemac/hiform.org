@@ -2,6 +2,7 @@
 
 namespace Drupal\blazy\Plugin\views\field;
 
+use Drupal\media\Entity\Media;
 use Drupal\views\ResultRow;
 
 /**
@@ -15,23 +16,43 @@ class BlazyViewsFieldMedia extends BlazyViewsFieldPluginBase {
    * {@inheritdoc}
    */
   public function render(ResultRow $values) {
-    /** @var \Drupal\media_entity\Entity\Media $media */
-    $media = $values->_entity;
+    /** @var \Drupal\media\Entity\Media $entity */
+    // @todo recheck relationship and remove this $entity = $values->_entity;
+    $entity = $this->getEntity($values);
 
-    $data['settings'] = $this->mergedViewsSettings();
-    $data['settings']['delta'] = $values->index;
-    $this->mergedSettings = $data['settings'];
+    if ($entity instanceof Media) {
+      $options['defer'] = TRUE;
+      $settings = $this->mergedViewsSettings($options);
 
-    // Pass results to \Drupal\blazy\BlazyEntity.
-    return $this->blazyEntity->build($data, $media, $media->label());
+      // Due to minimal settings, assumed core fields are in use.
+      $settings['image'] = 'field_media_image';
+      $data['#entity']   = $entity;
+      $data['#settings'] = $settings;
+      $data['#delta']    = $values->index;
+
+      // Populate media metadata earlier for their relevant libraries.
+      // Need field.target_bundles, since this views field has none.
+      // @todo remove once formatters and views fields are synced downstream.
+      $this->blazyMedia->prepare($data);
+
+      // Be sure after item setup.
+      $this->blazyManager->preSettings($data['#settings']);
+      $data['fallback'] = $entity->label();
+
+      // Pass results to \Drupal\blazy\BlazyEntity.
+      return $this->blazyEntity->build($data);
+    }
+    return [];
   }
 
   /**
-   * Defines the scope for the form elements.
+   * {@inheritdoc}
    */
-  public function getScopedFormElements() {
-    return ['multimedia' => TRUE, 'view_mode' => 'default']
-      + parent::getScopedFormElements();
+  protected function getPluginScopes(): array {
+    return [
+      'multimedia' => TRUE,
+      'view_mode' => 'default',
+    ] + parent::getPluginScopes();
   }
 
 }

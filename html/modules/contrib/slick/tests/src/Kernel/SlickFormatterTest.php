@@ -2,9 +2,10 @@
 
 namespace Drupal\Tests\slick\Kernel;
 
+use Drupal\slick\SlickDefault;
 use Drupal\Tests\blazy\Kernel\BlazyKernelTestBase;
+use Drupal\Tests\slick\Traits\SlickKernelTrait;
 use Drupal\Tests\slick\Traits\SlickUnitTestTrait;
-use Drupal\Slick\SlickDefault;
 
 /**
  * Tests the Slick field rendering using the image field type.
@@ -15,13 +16,14 @@ use Drupal\Slick\SlickDefault;
 class SlickFormatterTest extends BlazyKernelTestBase {
 
   use SlickUnitTestTrait;
+  use SlickKernelTrait;
 
   /**
    * Modules to enable.
    *
    * @var array
    */
-  public static $modules = [
+  protected static $modules = [
     'system',
     'user',
     'help',
@@ -93,10 +95,10 @@ class SlickFormatterTest extends BlazyKernelTestBase {
     $build = $this->display->build($entity);
     $build_empty = $this->displayEmpty->build($entity);
 
-    $render = $this->slickManager->getRenderer()->renderRoot($build);
+    $render = $this->slickManager->renderer()->renderRoot($build);
     $this->assertNotEmpty($render);
 
-    $render_empty = $this->slickManager->getRenderer()->renderRoot($build_empty[$this->testEmptyName]);
+    $render_empty = $this->slickManager->renderer()->renderRoot($build_empty[$this->testEmptyName]);
     $this->assertEmpty($render_empty);
 
     $this->assertInstanceOf('\Drupal\Core\Field\FieldItemListInterface', $this->testItems);
@@ -109,7 +111,7 @@ class SlickFormatterTest extends BlazyKernelTestBase {
     $this->assertEquals($this->testPluginId, $build[$this->testFieldName]['#formatter']);
 
     $scopes = $this->formatterInstance->getScopedFormElements();
-    $this->assertEquals('slick', $scopes['namespace']);
+    $this->assertEquals('slick', $scopes['blazies']->get('namespace'));
     $this->assertArrayHasKey('optionset', $scopes['settings']);
 
     $summary = $this->formatterInstance->settingsSummary();
@@ -129,9 +131,13 @@ class SlickFormatterTest extends BlazyKernelTestBase {
    */
   public function testGetThumbnail($uri, $expected) {
     $settings = $this->getFormatterSettings() + SlickDefault::extendedSettings();
-    $settings['uri'] = empty($uri) ? '' : $this->uri;
+    $blazies = $settings['blazies'];
 
-    $thumbnail = $this->slickFormatter->getThumbnail($settings, $this->testItem);
+    $blazies->set('image.uri', empty($uri) ? '' : $this->uri)
+      ->set('thumbnail.id', 'thumbnail');
+
+    // $item = $use_item ? $this->testItem : NULL;
+    $thumbnail = $this->slickFormatter->getThumbnail($settings);
     $this->assertEquals($expected, !empty($thumbnail));
   }
 
@@ -166,10 +172,10 @@ class SlickFormatterTest extends BlazyKernelTestBase {
    * @dataProvider providerTestBuildSettings
    */
   public function testBuildSettings(array $settings, $expected) {
-    $format['settings'] = array_merge($this->getFormatterSettings(), $settings) + SlickDefault::extendedSettings();
+    $format['#settings'] = array_merge($this->getFormatterSettings(), $settings) + SlickDefault::extendedSettings();
 
-    $this->slickFormatter->buildSettings($format, $this->testItems);
-    $this->assertArrayHasKey('bundle', $format['settings']);
+    $this->slickFormatter->preBuildElements($format, $this->testItems);
+    $this->assertArrayHasKey('blazies', $format['#settings']);
   }
 
   /**

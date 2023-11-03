@@ -4,7 +4,7 @@ namespace Drupal\slick_ui\Controller;
 
 use Drupal\Component\Utility\Html;
 use Drupal\Core\Entity\EntityInterface;
-use Drupal\blazy\BlazyGrid;
+use Drupal\slick\Entity\SlickInterface;
 
 /**
  * Provides a listing of Slick optionsets.
@@ -37,6 +37,11 @@ class SlickListBuilder extends SlickListBuilderBase {
    * {@inheritdoc}
    */
   public function buildRow(EntityInterface $entity) {
+    // Satisfy phpstan.
+    if (!($entity instanceof SlickInterface)) {
+      return parent::buildRow($entity);
+    }
+
     $skins = $this->manager->skinManager()->getSkins()['skins'];
     $skin = $entity->getSkin();
 
@@ -98,7 +103,6 @@ class SlickListBuilder extends SlickListBuilderBase {
     $settings = [];
     $settings['grid'] = 3;
     $settings['grid_medium'] = 2;
-    $settings['blazy'] = FALSE;
     $settings['style'] = 'column';
 
     $header = '<br><hr><h2>' . $this->t('Available skins') . '</h2>';
@@ -106,7 +110,7 @@ class SlickListBuilder extends SlickListBuilderBase {
     $build['skins_header']['#markup'] = $header;
     $build['skins_header']['#weight'] = 20;
 
-    $build['skins'] = BlazyGrid::build($availaible_skins, $settings);
+    $build['skins'] = $manager->toGrid($availaible_skins, $settings);
     $build['skins']['#weight'] = 21;
     $build['skins']['#attached'] = $manager->attach($settings);
     $build['skins']['#attached']['library'][] = 'blazy/admin';

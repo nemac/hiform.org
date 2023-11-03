@@ -2,11 +2,12 @@
 
 namespace Drupal\blazy\Plugin\Field\FieldFormatter;
 
-use Drupal\Core\Form\FormStateInterface;
+use Drupal\blazy\BlazyDefault;
+use Drupal\Core\Field\FieldDefinitionInterface;
+use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Field\FormatterBase;
-use Drupal\Core\Field\FieldDefinitionInterface;
-use Drupal\blazy\BlazyDefault;
+use Drupal\Core\Form\FormStateInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -30,52 +31,48 @@ class BlazyTextFormatter extends FormatterBase {
   /**
    * {@inheritdoc}
    */
-  public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
-    /**
-     * @var \Drupal\blazy\Plugin\Field\FieldFormatter\BlazyTextFormatter
-     */
-    $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
-    $instance->formatter = $container->get('blazy.manager');
+  protected static $namespace = 'blazy';
 
-    return $instance;
+  /**
+   * {@inheritdoc}
+   */
+  protected static $itemId = 'content';
+
+  /**
+   * {@inheritdoc}
+   */
+  protected static $itemPrefix = 'blazy';
+
+  /**
+   * {@inheritdoc}
+   */
+  protected static $captionId = 'caption';
+
+  /**
+   * {@inheritdoc}
+   */
+  protected static $fieldType = 'text';
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
+    $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
+    return static::injectServices($instance, $container, static::$fieldType);
   }
 
   /**
    * {@inheritdoc}
    */
   public static function defaultSettings() {
-    return BlazyDefault::baseSettings() + BlazyDefault::gridSettings();
+    return BlazyDefault::gridSettings();
   }
 
   /**
    * {@inheritdoc}
    */
   public function viewElements(FieldItemListInterface $items, $langcode) {
-    // Early opt-out if the field is empty.
-    if ($items->isEmpty()) {
-      return [];
-    }
-
-    // Build the settings.
-    $settings             = $this->buildSettings();
-    $settings['lazy']     = FALSE;
-    $settings['langcode'] = $langcode;
-    $settings['_grid']    = $settings['_unblazy'] = TRUE;
-
-    // The ProcessedText element already handles cache context & tag bubbling.
-    // @see \Drupal\filter\Element\ProcessedText::preRenderText()
-    $build = ['settings' => $settings];
-    foreach ($items as $item) {
-      $build[] = [
-        '#type'     => 'processed_text',
-        '#text'     => $item->value,
-        '#format'   => $item->format,
-        '#langcode' => $item->getLangcode(),
-      ];
-    }
-
-    // Pass to manager for easy updates to all Blazy formatters.
-    return $this->formatter->build($build);
+    return $this->baseViewElements($items, $langcode);
   }
 
   /**
@@ -88,9 +85,52 @@ class BlazyTextFormatter extends FormatterBase {
   }
 
   /**
-   * Defines the scope for the form elements.
+   * {@inheritdoc}
    */
-  public function getScopedFormElements() {
+  public static function isApplicable(FieldDefinitionInterface $field_definition) {
+    return $field_definition->getFieldStorageDefinition()->isMultiple();
+  }
+
+  /**
+   * Build the grid text elements.
+   */
+  protected function buildElements(array &$build, $items, $langcode) {
+    foreach ($this->getElements($items) as $element) {
+      $build['items'][] = $element;
+    }
+  }
+
+  /**
+   * Returns the Blazy elements, also for sub-modules to re-use.
+   */
+  protected function getElements($items): \Generator {
+    // The ProcessedText element already handles cache context & tag bubbling.
+    // @see \Drupal\filter\Element\ProcessedText::preRenderText()
+    foreach ($items as $item) {
+      $element = [];
+
+      if ($item instanceof FieldItemInterface) {
+        $class    = get_class($item);
+        $property = $class::mainPropertyName();
+
+        if ($value = $item->{$property}) {
+          $element = [
+            '#type'     => 'processed_text',
+            '#text'     => $value,
+            '#format'   => $item->format ?? NULL,
+            '#langcode' => $item->getLangcode(),
+          ];
+        }
+      }
+
+      yield $element;
+    }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function getPluginScopes(): array {
     return [
       'grid_form'        => TRUE,
       'grid_required'    => TRUE,
@@ -98,14 +138,19 @@ class BlazyTextFormatter extends FormatterBase {
       'no_layouts'       => TRUE,
       'responsive_image' => FALSE,
       'style'            => TRUE,
-    ] + $this->getCommonScopedFormElements();
+      'multiple'         => $this->isMultiple(),
+    ];
   }
 
   /**
    * {@inheritdoc}
    */
-  public static function isApplicable(FieldDefinitionInterface $field_definition) {
-    return $field_definition->getFieldStorageDefinition()->isMultiple();
+  protected function preSettings(array &$settings, $langcode): void {
+    $blazies = $settings['blazies'];
+
+    $blazies->set('is.unblazy', TRUE)
+      ->set('is.text', TRUE)
+      ->set('lazy', []);
   }
 
 }

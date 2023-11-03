@@ -2,9 +2,7 @@
 
 namespace Drupal\slick\Plugin\Field\FieldFormatter;
 
-use Drupal\Core\Field\FieldItemListInterface;
-use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
-use Drupal\blazy\Dejavu\BlazyEntityBase;
+use Drupal\blazy\Field\BlazyEntityVanillaBase;
 use Drupal\slick\SlickDefault;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -14,26 +12,48 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * @see \Drupal\slick_paragraphs\Plugin\Field\FieldFormatter
  * @see \Drupal\slick_entityreference\Plugin\Field\FieldFormatter
  */
-abstract class SlickEntityFormatterBase extends BlazyEntityBase implements ContainerFactoryPluginInterface {
+abstract class SlickEntityFormatterBase extends BlazyEntityVanillaBase {
 
-  use SlickFormatterViewTrait;
-  use SlickFormatterTrait {
-    buildSettings as traitBuildSettings;
-  }
-
-  /**
-   * The logger factory.
-   *
-   * @var \Drupal\Core\Logger\LoggerChannelFactoryInterface
-   */
-  protected $loggerFactory;
+  use SlickFormatterTrait;
 
   /**
    * {@inheritdoc}
    */
+  protected static $namespace = 'slick';
+
+  /**
+   * {@inheritdoc}
+   */
+  protected static $itemId = 'slide';
+
+  /**
+   * {@inheritdoc}
+   */
+  protected static $itemPrefix = 'slide';
+
+  /**
+   * {@inheritdoc}
+   */
+  protected static $captionId = 'caption';
+
+  /**
+   * {@inheritdoc}
+   */
+  protected static $navId = 'thumb';
+
+  /**
+   * {@inheritdoc}
+   */
+  protected static $fieldType = 'entity';
+
+  /**
+   * {@inheritdoc}
+   *
+   * @todo remove post blazy:2.17, no differences so far.
+   */
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
     $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
-    return self::injectServices($instance, $container, 'entity');
+    return static::injectServices($instance, $container, static::$fieldType);
   }
 
   /**
@@ -47,39 +67,9 @@ abstract class SlickEntityFormatterBase extends BlazyEntityBase implements Conta
    * {@inheritdoc}
    */
   public static function defaultSettings() {
-    return ['view_mode' => ''] + SlickDefault::baseSettings();
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function viewElements(FieldItemListInterface $items, $langcode) {
-    $entities = $this->getEntitiesToView($items, $langcode);
-
-    // Early opt-out if the field is empty.
-    if (empty($entities)) {
-      return [];
-    }
-
-    return $this->commonViewElements($items, $langcode, $entities);
-  }
-
-  /**
-   * Builds the settings.
-   *
-   * @todo inherit and extend parent post Blazy 2.x release.
-   */
-  public function buildSettings() {
-    return ['blazy' => TRUE, 'vanilla' => TRUE] + $this->traitBuildSettings();
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getScopedFormElements() {
-    return [
-      'no_layouts' => TRUE,
-    ] + $this->getCommonScopedFormElements() + parent::getScopedFormElements();
+    return ['view_mode' => '']
+      + SlickDefault::baseSettings()
+      + parent::defaultSettings();
   }
 
 }

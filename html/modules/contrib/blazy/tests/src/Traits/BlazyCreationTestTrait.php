@@ -2,16 +2,17 @@
 
 namespace Drupal\Tests\blazy\Traits;
 
-use Drupal\Core\File\FileSystemInterface;
-use Drupal\Core\Field\BaseFieldDefinition;
+use Drupal\blazy\Blazy;
 use Drupal\Core\Entity\Entity\EntityViewDisplay;
-use Drupal\node\Entity\NodeType;
+use Drupal\Core\Field\BaseFieldDefinition;
+use Drupal\Core\File\FileSystemInterface;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\file\Entity\File;
+use Drupal\file\FileInterface;
 use Drupal\filter\Entity\FilterFormat;
 use Drupal\image\Plugin\Field\FieldType\ImageItem;
-use Drupal\blazy\BlazyFile;
+use Drupal\node\Entity\NodeType;
 
 /**
  * A Trait common for Blazy tests.
@@ -39,15 +40,13 @@ trait BlazyCreationTestTrait {
    *   The formatter display instance.
    */
   protected function setUpFormatterDisplay($bundle = '', array $data = []) {
+    $settings   = $data['settings'] ?? [];
     $view_mode  = empty($data['view_mode']) ? 'default' : $data['view_mode'];
     $plugin_id  = empty($data['plugin_id']) ? $this->testPluginId : $data['plugin_id'];
     $field_name = empty($data['field_name']) ? $this->testFieldName : $data['field_name'];
-    $settings   = empty($data['settings']) ? [] : $data['settings'];
     $display_id = $this->entityType . '.' . $bundle . '.' . $view_mode;
-    $storage    = $this->blazyManager->getEntityTypeManager()->getStorage('entity_view_display');
+    $storage    = $this->blazyManager->getStorage('entity_view_display');
     $display    = $storage->load($display_id);
-
-    $this->blazyManager->getCommonSettings($settings);
 
     if (!$display) {
       $values = [
@@ -60,7 +59,7 @@ trait BlazyCreationTestTrait {
       $display = $storage->create($values);
     }
 
-    $settings['current_view_mode'] = $settings['view_mode'] = $view_mode;
+    $settings['view_mode'] = $view_mode;
     $display->setComponent($field_name, [
       'type'     => $plugin_id,
       'settings' => $settings,
@@ -146,8 +145,8 @@ trait BlazyCreationTestTrait {
    */
   protected function setUpContentTypeTest($bundle = '', array $settings = []) {
     $node_type = NodeType::load($bundle);
-    $full_html = $this->blazyManager->entityLoad('full_html', 'filter_format');
-    $restricted_html = $this->blazyManager->entityLoad('restricted_html', 'filter_format');
+    $full_html = $this->blazyManager->load('full_html', 'filter_format');
+    $restricted_html = $this->blazyManager->load('restricted_html', 'filter_format');
 
     if (empty($node_type)) {
       $node_type = NodeType::create([
@@ -223,7 +222,7 @@ trait BlazyCreationTestTrait {
       'status' => TRUE,
     ];
 
-    $node = $this->blazyManager->getEntityTypeManager()
+    $node = $this->blazyManager->entityTypeManager()
       ->getStorage($this->entityType)
       ->create($values);
 
@@ -234,7 +233,11 @@ trait BlazyCreationTestTrait {
       if (!empty($settings['extra_text'])) {
         $text .= $settings['extra_text'];
       }
-      $node->get('body')->setValue(['value' => $text, 'format' => 'full_html']);
+
+      /* @phpstan-ignore-next-line */
+      if ($body = $node->get('body')) {
+        $body->setValue(['value' => $text, 'format' => 'full_html']);
+      }
     }
 
     if (!empty($this->testFieldName)) {
@@ -259,7 +262,10 @@ trait BlazyCreationTestTrait {
         $max = $multiple ? $this->maxItems : 2;
         if (isset($node->{$field_name})) {
           // @see \Drupal\Core\Field\FieldItemListInterface::generateSampleItems
-          $node->get($field_name)->generateSampleItems($max);
+          /* @phpstan-ignore-next-line */
+          if ($field = $node->get($field_name)) {
+            $field->generateSampleItems($max);
+          }
         }
       }
     }
@@ -365,6 +371,7 @@ trait BlazyCreationTestTrait {
    */
   protected function buildEntityReferenceRenderArray(array $referenced_entities, $type = '', array $settings = []) {
     $type = empty($type) ? $this->entityPluginId : $type;
+    /* @phpstan-ignore-next-line */
     $items = $this->referencingEntity->get($this->entityFieldName);
 
     // Assign the referenced entities.
@@ -476,6 +483,7 @@ trait BlazyCreationTestTrait {
    * Set up dummy image.
    */
   protected function setUpRealImage() {
+    /* @phpstan-ignore-next-line */
     $this->uri = $this->getImagePath();
     $item = $this->dummyItem;
 
@@ -483,8 +491,9 @@ trait BlazyCreationTestTrait {
       $item = $this->testItems[0];
 
       if ($item instanceof ImageItem) {
+        /* @phpstan-ignore-next-line */
         $this->uri = ($entity = $item->entity) && empty($item->uri) ? $entity->getFileUri() : $item->uri;
-        $this->url = BlazyFile::transformRelative($this->uri);
+        $this->url = Blazy::transformRelative($this->uri);
       }
     }
 
@@ -492,17 +501,15 @@ trait BlazyCreationTestTrait {
       $source = $this->root . '/core/misc/druplicon.png';
       $uri = 'public://test.png';
       $this->fileSystem->copy($source, $uri, FileSystemInterface::EXISTS_REPLACE);
-      $this->url = BlazyFile::createUrl($uri);
+      $this->url = Blazy::createUrl($uri);
     }
 
     $this->testItem = $this->image = $item;
 
     $this->data = [
-      'settings' => $this->getFormatterSettings(),
-      'item'     => $item,
+      '#settings' => $this->getFormatterSettings(),
+      '#item'     => $item,
     ];
-
-    $this->imageFactory = $this->container->get('image.factory');
   }
 
   /**
@@ -511,11 +518,11 @@ trait BlazyCreationTestTrait {
   protected function getImagePath($is_dir = FALSE) {
     $path            = $this->root . '/sites/default/files/simpletest/' . $this->testPluginId;
     $item            = $this->createDummyImage();
-    $this->dummyUrl  = BlazyFile::transformRelative($this->dummyUri);
+    $this->dummyUrl  = Blazy::transformRelative($this->dummyUri);
     $this->dummyItem = $item;
     $this->dummyData = [
-      'settings' => $this->getFormatterSettings(),
-      'item'     => $item,
+      '#settings' => $this->getFormatterSettings(),
+      '#item' => $item,
     ];
 
     return $is_dir ? $path : $this->dummyUri;
@@ -540,7 +547,7 @@ trait BlazyCreationTestTrait {
     $item = File::create([
       'uri' => $uri,
       'uid' => 1,
-      'status' => FILE_STATUS_PERMANENT,
+      'status' => FileInterface::STATUS_PERMANENT,
       'filename' => $name,
     ]);
 

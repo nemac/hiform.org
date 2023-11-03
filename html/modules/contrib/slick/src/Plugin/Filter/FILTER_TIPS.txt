@@ -1,5 +1,8 @@
 <h3>Slick</h3>
-<p>Create a slideshow/ carousel with a shortcode. Pay attention to attributes,
+<p>If you copy paste the lines here into CKEditor, be sure to view CKEditor
+source and remove the surrounding <code>&lt;code&gt;...&lt;/code&gt;</code>.
+<br />
+Create a slideshow/ carousel with a shortcode. Pay attention to attributes,
 slashes, single and double quotes:</p>
 <ol>
   <li><b>Basic</b>, with inline HTML: <br>
@@ -53,6 +56,8 @@ slashes, single and double quotes:</p>
   <li><code>[slide]</code> can have attributes, including <code>caption</code>,
   e.g.: <br>
   <code>[slide class="slide--custom-class" caption='Read more...']</code>.</li>
+  <li>To disable thumbnail/ text navigation add <code>nav="false"</code>:
+  <code>[slick nav="false"]</code>.</li>
   <li>Except for self-closing one-liner <code>data</code> attribute, be sure
   slide items are stacked, separated by line breaks, or any relevant HTML tags,
   and wrapped each with <code>[slide]</code>:<br>

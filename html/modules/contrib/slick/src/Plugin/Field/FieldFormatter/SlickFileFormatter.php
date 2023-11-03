@@ -3,74 +3,69 @@
 namespace Drupal\slick\Plugin\Field\FieldFormatter;
 
 use Drupal\Core\Field\FieldDefinitionInterface;
-use Drupal\blazy\Dejavu\BlazyVideoTrait;
-use Symfony\Component\DependencyInjection\ContainerInterface;
+use Drupal\slick\SlickDefault;
 
 /**
- * Plugin implementation of the 'Slick File' formatter to get ME within images.
+ * Plugin implementation of the 'Slick File' to get image/ SVG from files.
  *
- * This is not 'Slick Media', instead a simple mix of image and optional video.
+ * This was previously for deprecated VEF, since 2.10 re-purposed for SVG, WIP!
  *
- * @todo TBD; deprecate for core Media and remove post/ prior to 3.x release.
- * @todo deprecated in blazy:8.x-2.0 and is removed from blazy:8.x-3.0. Use
- *   \Drupal\slick\Plugin\Field\FieldFormatter\SlickMediaFormatter instead.
+ * @FieldFormatter(
+ *   id = "slick_file",
+ *   label = @Translation("Slick File/SVG"),
+ *   field_types = {
+ *     "entity_reference",
+ *     "file",
+ *     "image",
+ *     "svg_image_field",
+ *   }
+ * )
+ *
+ * @todo remove `image` at 3.x, unless dedicated for SVG (forms and displays).
  */
 class SlickFileFormatter extends SlickFileFormatterBase {
 
-  // @todo remove post blazy:2.x.
-  use BlazyVideoTrait;
+  /**
+   * {@inheritdoc}
+   */
+  protected static $fieldType = 'entity';
 
   /**
    * {@inheritdoc}
    */
-  public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
-    $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
-    return self::injectServices($instance, $container, 'entity');
-  }
+  protected static $useOembed = TRUE;
 
   /**
    * {@inheritdoc}
    */
-  public function buildElement(array &$build, $entity) {
-    $settings = $build['settings'];
-    $data = [];
-    /** @var Drupal\Core\Field\Plugin\Field\FieldType\EntityReferenceItem $item */
-    // EntityReferenceItem provides $item->entity Drupal\file\Entity\File.
-    if (empty($build['item'])) {
-      // @todo remove condition post blazy:2.x.
-      if (method_exists($this->blazyOembed, 'getImageItem')) {
-        $data = $this->blazyOembed->getImageItem($entity);
-      }
-      // @todo remove post blazy:2.x.
-      elseif (method_exists($this, 'getImageItem')) {
-        $data = $this->getImageItem($entity);
-      }
+  protected static $useSvg = TRUE;
 
-      if ($data) {
-        $build['item'] = $data['item'];
-        $build['settings'] = array_merge($settings, $data['settings']);
-      }
-    }
-
-    $this->blazyOembed->getMediaItem($build, $entity);
+  /**
+   * {@inheritdoc}
+   */
+  public static function defaultSettings() {
+    return SlickDefault::svgSettings() + parent::defaultSettings();
   }
 
   /**
    * {@inheritdoc}
    */
   public function buildSettings() {
-    return ['blazy' => TRUE] + parent::getSettings();
+    return ['blazy' => TRUE] + parent::buildSettings();
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getScopedFormElements() {
+  protected function getPluginScopes(): array {
+    // @todo use $this->getEntityScopes() post blazy:2.17.
     return [
-      'fieldable_form' => TRUE,
-      'multimedia'     => TRUE,
-      'view_mode'      => $this->viewMode,
-    ] + $this->getCommonScopedFormElements() + parent::getScopedFormElements();
+      'fieldable_form'   => TRUE,
+      'multimedia'       => TRUE,
+      'no_loading'       => TRUE,
+      'no_preload'       => TRUE,
+      'responsive_image' => FALSE,
+    ] + parent::getPluginScopes();
   }
 
   /**
@@ -79,6 +74,15 @@ class SlickFileFormatter extends SlickFileFormatterBase {
   public static function isApplicable(FieldDefinitionInterface $field_definition) {
     $storage = $field_definition->getFieldStorageDefinition();
     return $storage->isMultiple() && $storage->getSetting('target_type') === 'file';
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * @todo remove post blazy:2.17.
+   */
+  public function buildElement(array &$element, $entity) {
+    $this->blazyOembed->build($element);
   }
 
 }

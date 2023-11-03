@@ -2,8 +2,8 @@
 
 namespace Drupal\Tests\blazy\Kernel;
 
-use Drupal\Tests\field\Kernel\FieldKernelTestBase;
 use Drupal\Tests\blazy\Traits\BlazyKernelTestTrait;
+use Drupal\Tests\field\Kernel\FieldKernelTestBase;
 
 /**
  * Defines base class for the Blazy formatter tests.
@@ -16,7 +16,7 @@ abstract class BlazyKernelTestBase extends FieldKernelTestBase {
    * Set to TRUE to strict check all configuration saved.
    *
    * Let's keep it enabled here for just in case core breaks it again related to
-   * responsive_image.styles.blazy_picture_test.
+   * resimage.styles.blazy_picture_test.
    *
    * @var bool
    * @see \Drupal\Core\Config\Development\ConfigSchemaChecker

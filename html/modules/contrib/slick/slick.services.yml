@@ -11,9 +11,9 @@ services:
 
   slick.admin:
     class: Drupal\slick\Form\SlickAdmin
-    arguments: ['@blazy.admin.extended', '@slick.manager']
+    arguments: ['@blazy.admin.formatter', '@slick.manager']
 
   slick.skin_manager:
     class: Drupal\slick\SlickSkinManager
     parent: default_plugin_manager
-    arguments: ['@app.root', '@config.factory']
+    arguments: ['%app.root%', '@config.factory']

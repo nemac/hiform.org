@@ -3,10 +3,8 @@
 namespace Drupal\blazy_test\Plugin\Field\FieldFormatter;
 
 use Drupal\blazy\BlazyDefault;
-use Drupal\blazy\Dejavu\BlazyEntityReferenceBase;
-use Drupal\blazy\Plugin\Field\FieldFormatter\BlazyFormatterTrait;
+use Drupal\blazy\Field\BlazyEntityReferenceBase;
 use Drupal\Core\Field\FieldItemListInterface;
-use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -18,16 +16,19 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  *   field_types = {"entity_reference", "file"}
  * )
  */
-class BlazyTestEntityReferenceFormatterTest extends BlazyEntityReferenceBase implements ContainerFactoryPluginInterface {
+class BlazyTestEntityReferenceFormatterTest extends BlazyEntityReferenceBase {
 
-  use BlazyFormatterTrait;
+  /**
+   * {@inheritdoc}
+   */
+  protected static $fieldType = 'entity';
 
   /**
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
     $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
-    return self::injectServices($instance, $container, 'entity');
+    return static::injectServices($instance, $container, static::$fieldType);
   }
 
   /**
@@ -38,17 +39,12 @@ class BlazyTestEntityReferenceFormatterTest extends BlazyEntityReferenceBase imp
   }
 
   /**
-   * Returns the slick service.
-   */
-  public function blazyEntity() {
-    return $this->blazyEntity;
-  }
-
-  /**
    * {@inheritdoc}
    */
   public static function defaultSettings() {
-    return BlazyDefault::extendedSettings() + BlazyDefault::gridSettings();
+    return BlazyDefault::extendedSettings()
+      + BlazyDefault::gridSettings()
+      + parent::defaultSettings();
   }
 
   /**
@@ -62,40 +58,16 @@ class BlazyTestEntityReferenceFormatterTest extends BlazyEntityReferenceBase imp
       return [];
     }
 
-    // Collects specific settings to this formatter.
-    $settings = $this->buildSettings();
-    $build = ['settings' => $settings];
-
-    $this->formatter()->buildSettings($build, $items);
-
-    // Build the elements.
-    $this->buildElements($build, $entities, $langcode);
-
-    // Pass to manager for easy updates to all Blazy formatters.
-    return $this->formatter->build($build);
-  }
-
-  /**
-   * Builds the settings.
-   */
-  public function buildSettings() {
-    $settings              = $this->getSettings();
-    $settings['blazy']     = TRUE;
-    $settings['lazy']      = 'blazy';
-    $settings['item_id']   = 'box';
-    $settings['plugin_id'] = $this->getPluginId();
-
-    return $settings;
+    return $this->commonViewElements($items, $langcode, $entities);
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getScopedFormElements() {
+  protected function getPluginScopes(): array {
     $admin       = $this->admin();
     $target_type = $this->getFieldSetting('target_type');
-    $views_ui    = $this->getFieldSetting('handler') == 'default';
-    $bundles     = $views_ui ? [] : $this->getFieldSetting('handler_settings')['target_bundles'];
+    $bundles     = $this->getAvailableBundles();
     $node        = $admin->getFieldOptions($bundles, ['entity_reference'], $target_type, 'node');
     $stages      = $admin->getFieldOptions($bundles, ['image'], $target_type);
 
@@ -105,7 +77,7 @@ class BlazyTestEntityReferenceFormatterTest extends BlazyEntityReferenceBase imp
       'overlays'   => $stages + $node,
       'thumbnails' => $stages,
       'optionsets' => ['default' => 'Default'],
-    ] + parent::getScopedFormElements();
+    ] + parent::getPluginScopes();
   }
 
 }

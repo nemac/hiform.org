@@ -19,7 +19,7 @@ function template_preprocess_slick_test(&$variables) {
   $element = $variables['element'];
 
   $variables['content'] = $element['#children'];
-  $variables['settings'] = isset($element['#settings']) ? $element['#settings'] : [];
+  $variables['settings'] = $element['#settings'] ?? [];
 }
 
 /**
@@ -35,7 +35,6 @@ function slick_test_library_info_alter(array &$libraries, $extension) {
           'weight' => -4,
         ],
       ];
-      unset($libraries['slick']['js']['/libraries/slick/slick/slick.min.js']);
     }
   }
 }
