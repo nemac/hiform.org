@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Drupal\Tests;
 
 use Drupal\Component\Utility\Html;
@@ -81,7 +83,7 @@ trait BrowserHtmlDebugTrait {
    * @return string
    *   The formatted HTML string.
    */
-  protected function formatHtmlOutputHeaders(array $headers) {
+  protected function formatHtmlOutputHeaders(array $headers): string {
     $flattened_headers = array_map(function ($header) {
       if (is_array($header)) {
         return implode(';', array_map('trim', $header));

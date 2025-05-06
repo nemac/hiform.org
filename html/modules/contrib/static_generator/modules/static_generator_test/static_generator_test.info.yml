@@ -1,0 +1,12 @@
+name: 'Static Generator Test'
+type: module
+description: 'Provides test configuration for Static Generator tests'
+package: Static Generator
+core_version_requirement: ^10 || ^11
+dependencies:
+  - block
+
+# Information added by Drupal.org packaging script on 2024-11-21
+version: '2.0.0-alpha4'
+project: 'static_generator'
+datestamp: 1732155714

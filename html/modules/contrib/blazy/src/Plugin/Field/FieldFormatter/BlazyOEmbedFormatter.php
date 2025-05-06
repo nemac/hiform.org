@@ -2,13 +2,13 @@
 
 namespace Drupal\blazy\Plugin\Field\FieldFormatter;
 
-use Drupal\blazy\BlazyDefault;
-use Drupal\blazy\Field\BlazyDependenciesTrait;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Field\FormatterBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\blazy\BlazyDefault;
+use Drupal\blazy\Field\BlazyDependenciesTrait;
 use Drupal\media\Entity\MediaType;
 use Drupal\media\Plugin\media\Source\OEmbedInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -99,6 +99,8 @@ class BlazyOEmbedFormatter extends FormatterBase {
     $this->admin()->buildSettingsForm($element, $definition);
 
     // Makes options look compact.
+    // @todo phpstan bug doesn't catch altered $element:
+    /* @phpstan-ignore-next-line */
     if (isset($element['background'])) {
       $element['background']['#weight'] = -99;
     }

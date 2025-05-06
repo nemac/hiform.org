@@ -2,9 +2,10 @@
 
 namespace Drupal\blazy\Plugin\views\style;
 
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\blazy\BlazyDefault;
 use Drupal\blazy\Views\BlazyStyleVanilla;
-use Drupal\Core\Form\FormStateInterface;
+use Drupal\blazy\internals\Internals;
 
 /**
  * Provides Blazy Grid style plugin.
@@ -45,7 +46,7 @@ class BlazyViews extends BlazyStyleVanilla implements BlazyViewsInterface {
    * {@inheritdoc}
    */
   public function admin() {
-    return \Drupal::service('blazy.admin');
+    return Internals::service('blazy.admin');
   }
 
   /**

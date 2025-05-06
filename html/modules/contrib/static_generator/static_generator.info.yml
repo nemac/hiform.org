@@ -1,0 +1,23 @@
+name: "Static Generator"
+type: module
+description: "Generates a static version of a Drupal site."
+package:  "Static Generator"
+core_version_requirement: ^10 || ^11
+configure: static_generator.settings
+dependencies:
+  - system
+  - user
+  - field
+  - field_ui
+  - datetime
+  - filter
+  - text
+  - options
+  - node
+  - workflows
+  - content_moderation
+
+# Information added by Drupal.org packaging script on 2024-11-21
+version: '2.0.0-alpha4'
+project: 'static_generator'
+datestamp: 1732155714

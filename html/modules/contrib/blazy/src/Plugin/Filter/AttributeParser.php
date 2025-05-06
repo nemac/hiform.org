@@ -2,9 +2,9 @@
 
 namespace Drupal\blazy\Plugin\Filter;
 
+use Drupal\Component\Utility\Crypt;
 use Drupal\blazy\Blazy;
 use Drupal\blazy\internals\Internals;
-use Drupal\Component\Utility\Crypt;
 
 /**
  * Provides filter attribute utilities.
@@ -37,6 +37,8 @@ class AttributeParser {
         $data_uri = Blazy::isDataUri($check);
         // @todo recheck against sub-modules priority order in Filter admin.
         // The SRC might be 1px, but DATA-SRC is the real data URI.
+        // @todo phpstan bug doesn't catch multiple conditions:
+        /* @phpstan-ignore-next-line */
         if (!$data_uri || ($data_uri && $use_data_uri)) {
           return $check;
         }
@@ -111,10 +113,6 @@ class AttributeParser {
         $blazies->set('is.grid', $is_grid);
 
         if (!empty($settings['style'])) {
-          // Babysits typo due to hardcoding. The expected is flex, not flexbox.
-          if ($settings['style'] == 'flexbox') {
-            $settings['style'] = 'flex';
-          }
           Internals::toNativeGrid($settings);
         }
       }

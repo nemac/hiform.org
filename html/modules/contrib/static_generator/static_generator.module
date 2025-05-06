@@ -1,0 +1,211 @@
+<?php
+
+/**
+ * @file
+ * Generates a static version of a Drupal site.
+ */
+
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\node\NodeInterface;
+use Drupal\user\Entity\User;
+
+/**
+ * Implements hook_help().
+ *
+ * @param $route_name
+ * @param \Drupal\Core\Routing\RouteMatchInterface $route_match
+ *
+ * @return string
+ */
+function static_generator_help($route_name, RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    case 'help.page.static_generator':
+      $output = '<h3>' . t('About') . '</h3>';
+      $output .= '<p>' . t('The Static Generator module generates a static version of a Drupal site. For more information, see the <a href=":static_generator-documentation">online documentation for the Static Generator module</a>.', [':static_generator-documentation' => 'https://www.drupal.org/documentation/modules/static_generator']) . '</p>';
+      $output .= '<h3>' . t('Uses') . '</h3>';
+      $output .= '<dl>';
+      $output .= '<dt>' . t('Creating a read only "brochure" site.') . '</dt>';
+      $output .= '<dd>' . t('Creating a hybrid static/dynamic site') . '</dd>';
+      $output .= '</dl>';
+      return $output;
+  }
+}
+
+/**
+ * Implements hook_ENTITY_postsave().
+ *
+ * @param \Drupal\Core\Entity\EntityInterface $entity
+ *
+ * @throws \Drupal\Core\Entity\EntityMalformedException
+ */
+function static_generator_entity_insert(EntityInterface $entity) {
+  _static_generator_process_entity($entity, 'insert');
+}
+
+/**
+ * Implements hook_entity_update().
+ *
+ * @param \Drupal\Core\Entity\EntityInterface $entity
+ *
+ * @throws \Drupal\Core\Entity\EntityMalformedException
+ */
+function static_generator_entity_update(EntityInterface $entity) {
+  _static_generator_process_entity($entity, 'update');
+}
+
+/**
+ * Utility function fo hand workflow real time generation.
+ *
+ * @param \Drupal\Core\Entity\EntityInterface $entity
+ *
+ * @param $operation
+ *
+ * @throws \Drupal\Core\Entity\EntityMalformedException
+ */
+function _static_generator_process_entity(EntityInterface $entity, $operation) {
+  if ($entity->getEntityTypeId() === 'node') {
+    // Get list of content types allowed to be generated.
+    $bundles_string = \Drupal::service('config.factory')
+      ->get('static_generator.settings')
+      ->get('gen_node');
+
+    $bundles = explode(',', $bundles_string);
+
+    // Return if SG is not enabled for the content type.
+    if (!in_array($entity->bundle(), $bundles)) {
+      return;
+    }
+
+    // Get the path.
+    if ($operation == 'update') {
+      $path = $entity->toUrl()->toString();
+    }
+    elseif (\Drupal::hasService('pathauto.generator')) {
+      $path_array = \Drupal::service('pathauto.generator')
+        ->createEntityAlias($entity, 'insert');
+      $path = $path_array['alias'];
+    }
+
+    // Handle missing alias.
+    if (!isset($path)) {
+      $path = $entity->toUrl()->toString();
+    }
+
+    // Ensure path has leading slash.
+    if (substr($path, 0, 1) !== '/') {
+      $path = '/' . $path;
+    }
+
+    // @todo: Expose this for other modules.
+    if ($entity->hasField('moderation_state')) {
+      // If moderation state is published, queue for generation.
+      if ($entity->get('moderation_state')->value == 'published') {
+        \Drupal::service('static_generator')->queuePage($path);
+      }
+      // If it is archived, delete static page.
+      elseif ($entity->get('moderation_state')->value == 'archived') {
+        $path_alias = \Drupal::service('path_alias.manager')->getAliasByPath('/node/' . $entity->id());
+        \Drupal::service('static_generator')->queuePage($path_alias, 'delete');
+      }
+    }
+  }
+
+  // Media.
+  if ($entity->getEntityTypeId() === 'media') {
+    // @todo Make picker for media bundles on settings page.
+    //    $bundles_string = $this->configFactory->get('static_generator.settings')
+    //      ->get('gen_media');
+    //    $bundles = explode(',', $bundles_string);
+
+    $bundles = [];
+    $bundles[] = 'remote_video';
+    if (!in_array($entity->bundle(), $bundles)) {
+      return;
+    }
+
+    if ($operation == 'update') {
+      $path = $entity->toUrl()->toString();
+    }
+    elseif (\Drupal::hasService('pathauto.generator')) {
+      $path_array = \Drupal::service('pathauto.generator')
+        ->createEntityAlias($entity, 'insert');
+      $path = $path_array['alias'];
+    }
+    if (!isset($path)) {
+      $path = $entity->toUrl()->toString();
+    }
+    if (substr($path, 0, 1) !== '/') {
+      $path = '/' . $path;
+    }
+    if ($entity->hasField('moderation_state')) {
+      if ($entity->get('moderation_state')->value == 'published') {
+        \Drupal::service('static_generator')->queuePage($path);
+      } elseif ($entity->get('moderation_state')->value == 'archived') {
+        \Drupal::service('static_generator')->queuePage($path, 'delete');
+      }
+    }
+  }
+
+  // Menu Item.
+  if ($entity->getEntityTypeId() === 'menu_link_content') {
+
+    // Generate page for this link, children and siblings..
+    $menu_link_uri = $entity->link->uri;
+    $path = '/' . substr($menu_link_uri, 7);
+
+    \Drupal::service('static_generator')
+      ->generatePagesMenuChildrenSiblings($entity, $path);
+  }
+}
+
+/**
+ * Implements hook_entity_predelete()
+ *
+ * @param Drupal\Core\Entity\EntityInterface $entity
+ * @return void
+ */
+function static_generator_entity_predelete($entity) {
+  // Only operate on nodes.
+  if ($entity->getEntityTypeId() !== 'node') {
+    return;
+  }
+
+  // We queue the deletion here b/c the alias is not available in hook_entity_delete().
+  $nid = $entity->id();
+  $alias = \Drupal::service('path_alias.manager')->getAliasByPath('/node/' . $nid);
+  \Drupal::service('static_generator')->queuePage($alias, 'delete');
+}
+
+/**
+ * Implements hook_form_alter().
+ *
+ * @param $form
+ * @param $form_state
+ * @param $form_id
+ */
+function static_generator_form_alter(&$form, $form_state, $form_id) {
+  $has_generate_permission = User::load(\Drupal::currentUser()
+    ->id())->hasPermission('generate static pages');
+
+  if ($has_generate_permission && substr($form_id, 0, 5) == 'node_' && \Drupal::service('static_generator')->endsWith($form_id, '_edit_form')) {
+    $node = $form_state->getFormObject()->getEntity();
+    if ($node instanceof NodeInterface) {
+      if ($node->isPublished()) {
+        \Drupal::service('static_generator')
+          ->generationInfoForm('/node/' . $node->id(), $node, $form, TRUE);
+      }
+    }
+  }
+
+  if ($has_generate_permission && in_array($form_id, [
+    'media_image_edit_form',
+    'media_remote_video_edit_form',
+  ])) {
+    $media = $form_state->getFormObject()->getEntity();
+    if ($media->isPublished()) {
+      \Drupal::service('static_generator')
+        ->generationInfoForm('/media/' . $media->id(), $media, $form, TRUE);
+    }
+  }
+}

@@ -12,6 +12,8 @@ class Condition implements ConditionInterface, \Countable {
 
   /**
    * Provides a map of condition operators to condition operator options.
+   *
+   * @var string[][]
    */
   protected static $conditionOperatorMap = [
     'BETWEEN' => ['delimiter' => ' AND '],
@@ -258,12 +260,12 @@ class Condition implements ConditionInterface, \Countable {
             $this->stringVersion = '( AND 1 = 0 )';
 
             // Conceptually throwing an exception caused by user input is bad
-            // as you result into a WSOD, which depending on your webserver
-            // configuration can result into the assumption that your site is
-            // broken.
+            // as you result into a 'white screen of death', which depending on
+            // your webserver configuration can result into the assumption that
+            // your site is broken.
             // On top of that the database API relies on __toString() which
             // does not allow to throw exceptions.
-            trigger_error('Invalid characters in query operator: ' . $condition['operator'], E_USER_ERROR);
+            trigger_error('Invalid characters in query operator: ' . $condition['operator'], E_USER_WARNING);
             return;
           }
 

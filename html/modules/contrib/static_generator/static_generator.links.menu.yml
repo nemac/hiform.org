@@ -1,0 +1,5 @@
+static_generator.settings:
+  title: Static Generator
+  description: 'Configure Static Generator settings.'
+  route_name: static_generator.settings
+  parent: system.admin_config

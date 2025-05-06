@@ -2,9 +2,9 @@
 
 namespace Drupal\blazy\Media;
 
-use Drupal\blazy\internals\Internals;
-use Drupal\blazy\Theme\Attributes;
 use Drupal\Core\Cache\Cache;
+use Drupal\blazy\Theme\Attributes;
+use Drupal\blazy\internals\Internals;
 
 /**
  * Provides responsive image utilities.
@@ -132,7 +132,7 @@ class BlazyResponsiveImage {
   public static function dimensions(
     array &$settings,
     $resimage = NULL,
-    $initial = FALSE
+    $initial = FALSE,
   ): void {
     $blazies    = $settings['blazies'];
     $dimensions = $blazies->get('resimage.dimensions', []);
@@ -178,7 +178,9 @@ class BlazyResponsiveImage {
     $blazies->set('image', end($dimensions), TRUE);
 
     // Currently only needed by Preload.
-    if ($initial && $resimage && !empty($settings['preload'])) {
+    // @todo phpstan bug, misleading with multiple conditions.
+    /* @phpstan-ignore-next-line */
+    if ($initial && ($resimage && !empty($settings['preload']))) {
       self::sources($settings, $resimage);
     }
   }

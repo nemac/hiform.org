@@ -2,10 +2,12 @@
 
 namespace Drupal\Core\Field;
 
+use Drupal\Core\Config\Action\Attribute\ActionMethod;
 use Drupal\Core\Config\Entity\ConfigEntityBase;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\TypedData\FieldItemDataDefinition;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 
 /**
  * Base class for configurable field definitions.
@@ -134,10 +136,10 @@ abstract class FieldConfigBase extends ConfigEntityBase implements FieldConfigIn
    *
    * Example for an integer field:
    * @code
-   * array(
-   *   array('value' => 1),
-   *   array('value' => 2),
-   * )
+   * [
+   *   ['value' => 1],
+   *   ['value' => 2],
+   * ]
    * @endcode
    *
    * @var array
@@ -279,6 +281,13 @@ abstract class FieldConfigBase extends ConfigEntityBase implements FieldConfigIn
     if (empty($this->field_type)) {
       $this->field_type = $this->getFieldStorageDefinition()->getType();
     }
+
+    // Make sure all expected runtime settings are present.
+    $default_settings = \Drupal::service('plugin.manager.field.field_type')
+      ->getDefaultFieldSettings($this->getType());
+    // Filter out any unknown (unsupported) settings.
+    $supported_settings = array_intersect_key($this->getSettings(), $default_settings);
+    $this->set('settings', $supported_settings + $default_settings);
   }
 
   /**
@@ -320,6 +329,7 @@ abstract class FieldConfigBase extends ConfigEntityBase implements FieldConfigIn
   /**
    * {@inheritdoc}
    */
+  #[ActionMethod(adminLabel: new TranslatableMarkup('Set field label'), pluralize: FALSE)]
   public function setLabel($label) {
     $this->label = $label;
     return $this;
@@ -335,6 +345,7 @@ abstract class FieldConfigBase extends ConfigEntityBase implements FieldConfigIn
   /**
    * {@inheritdoc}
    */
+  #[ActionMethod(adminLabel: new TranslatableMarkup('Set field description'), pluralize: FALSE)]
   public function setDescription($description) {
     $this->description = $description;
     return $this;
@@ -351,6 +362,7 @@ abstract class FieldConfigBase extends ConfigEntityBase implements FieldConfigIn
   /**
    * {@inheritdoc}
    */
+  #[ActionMethod(adminLabel: new TranslatableMarkup('Set whether field is translatable'), pluralize: FALSE)]
   public function setTranslatable($translatable) {
     $this->translatable = $translatable;
     return $this;
@@ -366,6 +378,7 @@ abstract class FieldConfigBase extends ConfigEntityBase implements FieldConfigIn
   /**
    * {@inheritdoc}
    */
+  #[ActionMethod(adminLabel: new TranslatableMarkup('Set field settings'), pluralize: FALSE)]
   public function setSettings(array $settings) {
     $this->settings = $settings + $this->settings;
     return $this;
@@ -401,6 +414,7 @@ abstract class FieldConfigBase extends ConfigEntityBase implements FieldConfigIn
   /**
    * {@inheritdoc}
    */
+  #[ActionMethod(adminLabel: new TranslatableMarkup('Set whether field is required'), pluralize: FALSE)]
   public function setRequired($required) {
     $this->required = $required;
     return $this;
@@ -433,6 +447,7 @@ abstract class FieldConfigBase extends ConfigEntityBase implements FieldConfigIn
   /**
    * {@inheritdoc}
    */
+  #[ActionMethod(adminLabel: new TranslatableMarkup('Set default value'), pluralize: FALSE)]
   public function setDefaultValue($value) {
     $this->default_value = $this->normalizeValue($value, $this->getFieldStorageDefinition()->getMainPropertyName());
     return $this;
@@ -461,10 +476,12 @@ abstract class FieldConfigBase extends ConfigEntityBase implements FieldConfigIn
    * @todo Investigate in https://www.drupal.org/node/1977206.
    */
   public function __sleep() {
+    $properties = get_object_vars($this);
+
     // Only serialize necessary properties, excluding those that can be
     // recalculated.
-    $properties = get_object_vars($this);
-    unset($properties['fieldStorage'], $properties['itemDefinition'], $properties['original']);
+    unset($properties['itemDefinition'], $properties['original']);
+
     return array_keys($properties);
   }
 

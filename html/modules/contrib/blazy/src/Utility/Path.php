@@ -17,28 +17,28 @@ class Path {
   /**
    * The AMP page.
    *
-   * @var bool
+   * @var bool|null
    */
   protected static $isAmp;
 
   /**
    * The preview mode to disable Blazy where JS is not available, or useless.
    *
-   * @var bool
+   * @var bool|null
    */
   protected static $isPreview;
 
   /**
    * The preview mode to disable interactive elements.
    *
-   * @var bool
+   * @var bool|null
    */
   protected static $isSandboxed;
 
   /**
    * Retrieves the file url generator service.
    *
-   * @return \Drupal\Core\File\FileUrlGenerator
+   * @return \Drupal\Core\File\FileUrlGenerator|null
    *   The file url generator.
    *
    * @see https://www.drupal.org/node/2940031
@@ -50,7 +50,7 @@ class Path {
   /**
    * Retrieves the path resolver.
    *
-   * @return \Drupal\Core\Extension\ExtensionPathResolver
+   * @return \Drupal\Core\Extension\ExtensionPathResolver|null
    *   The path resolver.
    */
   public static function pathResolver() {
@@ -60,7 +60,7 @@ class Path {
   /**
    * Retrieves the request stack.
    *
-   * @return \Symfony\Component\HttpFoundation\RequestStack
+   * @return \Symfony\Component\HttpFoundation\RequestStack|null
    *   The request stack.
    */
   public static function requestStack() {
@@ -70,7 +70,7 @@ class Path {
   /**
    * Retrieves the currently active route match object.
    *
-   * @return \Drupal\Core\Routing\RouteMatchInterface
+   * @return \Drupal\Core\Routing\RouteMatchInterface|null
    *   The currently active route match object.
    */
   public static function routeMatch() {
@@ -80,7 +80,7 @@ class Path {
   /**
    * Retrieves the stream wrapper manager service.
    *
-   * @return \Drupal\Core\StreamWrapper\StreamWrapperManager
+   * @return \Drupal\Core\StreamWrapper\StreamWrapperManager|null
    *   The stream wrapper manager.
    */
   public static function streamWrapperManager() {
@@ -90,7 +90,7 @@ class Path {
   /**
    * Retrieves the request.
    *
-   * @return \Symfony\Component\HttpFoundation\Request
+   * @return \Symfony\Component\HttpFoundation\Request|null
    *   The request.
    *
    * @see https://github.com/symfony/symfony/blob/6.0/src/Symfony/Component/HttpFoundation/Request.php
@@ -104,18 +104,14 @@ class Path {
 
   /**
    * Returns the commonly used path, or just the base path.
-   *
-   * @todo remove drupal_get_path check when min D9.3.
    */
   public static function getPath($type, $name, $absolute = FALSE): ?string {
     if ($resolver = self::pathResolver()) {
       $path = $resolver->getPath($type, $name);
+
+      return $absolute ? Internals::basePath() . $path : $path;
     }
-    else {
-      $function = 'drupal_get_path';
-      $path = is_callable($function) ? $function($type, $name) : '';
-    }
-    return $absolute ? \base_path() . $path : $path;
+    return '';
   }
 
   /**
@@ -134,7 +130,7 @@ class Path {
   public static function isAmp(): bool {
     if (!isset(static::$isAmp)) {
       $request = self::request();
-      static::$isAmp = $request && $request->query->get('amp');
+      static::$isAmp = $request && $request->query->get('amp') !== NULL;
     }
     return static::$isAmp;
   }
@@ -160,70 +156,6 @@ class Path {
       static::$isSandboxed = $check;
     }
     return static::$isSandboxed;
-  }
-
-  /**
-   * Returns multiple libraries keyed by its name.
-   *
-   * @todo remove for \Drupal\blazy\Asset\Libraries::getLibraries() at 3.x.
-   */
-  public static function getLibraries(array $names, $base_path = FALSE): array {
-    $libraries = [];
-    foreach (self::libraries($names, TRUE) as $key => $path) {
-      if ($path) {
-        $libraries[$key] = $base_path ? \base_path() . $path : $path;
-      }
-    }
-    return $libraries;
-  }
-
-  /**
-   * Returns the first found library path.
-   *
-   * @todo remove for \Drupal\blazy\Asset\Libraries::getPath() at 3.x.
-   */
-  public static function getLibrariesPath($name, $base_path = FALSE): ?string {
-    $library = '';
-    $names = is_array($name) ? $name : [$name];
-    foreach (self::libraries($names) as $path) {
-      if ($path) {
-        $library = $base_path ? \base_path() . $path : $path;
-        break;
-      }
-    }
-    return $library;
-  }
-
-  /**
-   * Provides a wrapper to replace deprecated libraries_get_path() at ease.
-   *
-   * @todo remove for \Drupal\blazy\Asset\Libraries methods at 3.x.
-   */
-  private static function libraries(array $libraries, $keyed = FALSE): \Generator {
-    if ($finder = Internals::service('library.libraries_directory_file_finder')) {
-      foreach ($libraries as $library) {
-        $result = $finder->find($library);
-        if ($keyed) {
-          yield $library => $result;
-        }
-        else {
-          yield $result;
-        }
-      }
-    }
-    else {
-      // @todo remove when min D9.2, and make libraries a service at 3.x.
-      $dep = 'libraries_get_path';
-      foreach ($libraries as $library) {
-        $result = is_callable($dep) ? $dep($library) : '';
-        if ($keyed) {
-          yield $library => $result;
-        }
-        else {
-          yield $result;
-        }
-      }
-    }
   }
 
 }

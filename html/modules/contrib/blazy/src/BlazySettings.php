@@ -2,8 +2,8 @@
 
 namespace Drupal\blazy;
 
-use Drupal\blazy\Utility\Arrays;
 use Drupal\Component\Utility\NestedArray;
+use Drupal\blazy\Utility\Arrays;
 
 /**
  * Provides settings object.
@@ -329,7 +329,7 @@ class BlazySettings implements \Countable {
    * @param string $key
    *   The key identifying this reset object.
    *
-   * @return $this
+   * @return \Drupal\blazy\BlazySettings
    *   The new BlazySettings instance.
    */
   public function reset(array &$settings, $key = 'blazies'): self {
@@ -340,14 +340,6 @@ class BlazySettings implements \Countable {
     // $this->rksort($data);
     // }
     $instance = new self($data);
-
-    // @todo remove post gridstack 2.12 due to newly added $key.
-    if ($instance->get('namespace') == 'gridstack'
-      && $instance->get('engine')) {
-      if ($key == 'blazies') {
-        $key = 'gridstacks';
-      }
-    }
 
     $settings[$key] = $instance;
     return $instance;
@@ -383,7 +375,7 @@ class BlazySettings implements \Countable {
 
     if (is_array($value) && $merge) {
       $value = array_merge((array) $this->get($key, []), $value);
-      // @todo disable if any more Array to string conversion.
+      // @todo recheck Array to string conversion.
       if (isset($value[1])) {
         $value = array_unique($value, SORT_REGULAR);
       }
@@ -400,6 +392,8 @@ class BlazySettings implements \Countable {
 
   /**
    * Sorts recursively.
+   *
+   * @phpstan-ignore-next-line
    */
   private function rksort(&$a): bool {
     if (!is_array($a)) {

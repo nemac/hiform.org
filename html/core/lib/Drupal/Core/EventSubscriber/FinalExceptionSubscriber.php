@@ -126,7 +126,7 @@ class FinalExceptionSubscriber implements EventSubscriberInterface {
     }
 
     $content_type = $event->getRequest()->getRequestFormat() == 'html' ? 'text/html' : 'text/plain';
-    $content = $this->t('The website encountered an unexpected error. Please try again later.');
+    $content = $this->t('The website encountered an unexpected error. Try again later.');
     $content .= $message ? '<br><br>' . $message : '';
     $response = new Response($content, 500, ['Content-Type' => $content_type]);
 
@@ -152,7 +152,7 @@ class FinalExceptionSubscriber implements EventSubscriberInterface {
    */
   public function on4xx(ExceptionEvent $event) {
     $exception = $event->getThrowable();
-    if ($exception && $exception instanceof HttpExceptionInterface && str_starts_with($exception->getStatusCode(), '4')) {
+    if ($exception && $exception instanceof HttpExceptionInterface && str_starts_with((string) $exception->getStatusCode(), '4')) {
       $message = PlainTextOutput::renderFromHtml($exception->getMessage());
       // If the exception is cacheable, generate a cacheable response.
       if ($exception instanceof CacheableDependencyInterface) {

@@ -70,7 +70,6 @@
   var FN_VIEWPORT = $.viewport;
   var FN;
 
-
   /**
    * Constructor for Bio, Blazy IntersectionObserver.
    *
@@ -108,7 +107,6 @@
     var count = me.count;
     var io = me.ioObserver;
     var watching = opts.visibleClass || revalidate || false;
-    var check;
 
     // Only destroy if no use for is-b-visible class.
     if (BIOTICK === count - 1) {
@@ -125,14 +123,9 @@
     if (io) {
       // We are here with arbitrary observed elements for hidden children.
       // See https://drupal.org/node/3279316.
-      if (!$.is(el, sel)) {
-        check = $.find(el, sel);
-        if ($.isElm(check)) {
-          // The job is done, unobserve.
-          io.unobserve(el);
-          // Pass back bounding rects to the unbound hidden element here on.
-          el = check;
-        }
+      var hidden = FN_OBSERVER.hiddenChild(el, sel);
+      if (hidden) {
+        el = hidden;
       }
 
       if (me.isLoaded(el) && !revalidate) {
@@ -230,6 +223,11 @@
 
       // The element is being intersected.
       if (visible) {
+        // Triggers loading indicator animation before being loaded.
+        if (!me.isLoaded(el)) {
+          $[ADDCLASS](cn, C_IS_VISIBLE);
+        }
+
         intersecting.call(me, el);
 
         // The intersecting does the loading, the check must be afterwards.
@@ -286,6 +284,7 @@
     me.count = elms.length;
     me._raf = [];
     me._queue = [];
+    me.withIo = true;
 
     // Observe elements. Old blazy as fallback is also initialized here.
     // IO will unobserve, or disconnect. Old bLazy will self destroy.
@@ -390,7 +389,7 @@
         io.disconnect();
       }
 
-      FN_OBSERVER.unload(me);
+      FN_OBSERVER.unload();
       me.count = 0;
       me.elms = [];
       me.ioObserver = null;
@@ -406,13 +405,11 @@
 
     // Observe as IO, or initialize old bLazy as fallback.
     if (!INITIALIZED || reobserve) {
-      if ($.isIo) {
-        WINDATA = FN_OBSERVER.init(me, interact, elms, true);
+      WINDATA = FN_OBSERVER.init(me, interact, elms, true);
 
-        me.destroyed = false;
-      }
+      me.destroyed = false;
 
-      FN_OBSERVER.observe(me, elms, true);
+      FN_OBSERVER.observe();
 
       INITIALIZED = true;
     }

@@ -2,9 +2,9 @@
 
 namespace Drupal\blazy\Media;
 
+use Drupal\Component\Utility\UrlHelper;
 use Drupal\blazy\Blazy;
 use Drupal\blazy\Utility\CheckItem;
-use Drupal\Component\Utility\UrlHelper;
 
 /**
  * Provides preload utility.
@@ -35,11 +35,10 @@ class Preloader {
       return;
     }
 
-    if ($links = self::generate($images, $sources, $blazies)) {
-      foreach ($links as $key => $value) {
-        if ($value) {
-          $load['html_head'][$key] = $value;
-        }
+    $links = self::generate($images, $sources, $blazies);
+    foreach ($links as $key => $value) {
+      if ($value) {
+        $load['html_head'][$key] = $value;
       }
     }
   }
